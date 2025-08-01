@@ -4,6 +4,8 @@ import inspect
 import sys
 
 
+BYTE_SIZE = 256
+
 IOTA = 0
 
 
@@ -114,7 +116,7 @@ class WMA(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['A']
         return reg, BLANK_FLAGS
 
@@ -128,7 +130,7 @@ class WMX(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['X']
         return reg, BLANK_FLAGS
 
@@ -142,7 +144,7 @@ class WMY(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['Y']
         return reg, BLANK_FLAGS
 
@@ -156,7 +158,7 @@ class RMA(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         reg['A'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -170,7 +172,7 @@ class RMX(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         reg['X'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -184,7 +186,7 @@ class RMY(BaseInstruction):
 
     @staticmethod
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        location = data_to_memory_location(data)
+        location = data_to_memory_location(data) % len(ram)
         reg['Y'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -200,7 +202,7 @@ class AAX(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['A'] += reg['X']
         flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % 256
+        reg['A'] = reg['A'] % BYTE_SIZE
         return reg, flags
 
 
@@ -215,7 +217,7 @@ class AAY(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['A'] += reg['Y']
         flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % 256
+        reg['A'] = reg['A'] % BYTE_SIZE
         return reg, flags
 
 
@@ -230,7 +232,7 @@ class AXY(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['X'] += reg['Y']
         flags = set_flags(reg['X'])
-        reg['X'] = reg['X'] % 256
+        reg['X'] = reg['X'] % BYTE_SIZE
         return reg, flags
 
 
@@ -246,7 +248,7 @@ class SAX(BaseInstruction):
         reg['A'] -= reg['X']
         flags = set_flags(reg['A'])
         if reg['A'] < 0:
-            reg['A'] += 256
+            reg['A'] += BYTE_SIZE
         return reg, flags
 
 
@@ -262,7 +264,7 @@ class SAY(BaseInstruction):
         reg['A'] -= reg['Y']
         flags = set_flags(reg['A'])
         if reg['A'] < 0:
-            reg['A'] += 256
+            reg['A'] += BYTE_SIZE
         return reg, flags
 
 
@@ -278,7 +280,7 @@ class SXY(BaseInstruction):
         reg['X'] -= reg['Y']
         flags = set_flags(reg['X'])
         if reg['X'] < 0:
-            reg['X'] += 256
+            reg['X'] += BYTE_SIZE
         return reg, flags
 
 
@@ -468,7 +470,7 @@ class INA(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['A'] += 1
         flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % 256
+        reg['A'] = reg['A'] % BYTE_SIZE
         return reg, flags
 
 
@@ -483,7 +485,7 @@ class INX(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['X'] += 1
         flags = set_flags(reg['X'])
-        reg['X'] = reg['X'] % 256
+        reg['X'] = reg['X'] % BYTE_SIZE
         return reg, flags
 
 
@@ -498,7 +500,7 @@ class INY(BaseInstruction):
     def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
         reg['Y'] += 1
         flags = set_flags(reg['Y'])
-        reg['Y'] = reg['Y'] % 256
+        reg['Y'] = reg['Y'] % BYTE_SIZE
         return reg, flags
 
 
@@ -514,7 +516,7 @@ class DEA(BaseInstruction):
         reg['A'] -= 1
         flags = set_flags(reg['A'])
         if flags['N']:
-            reg['A'] = reg['A'] + 256
+            reg['A'] += BYTE_SIZE
         return reg, flags
 
 
@@ -530,7 +532,7 @@ class DEX(BaseInstruction):
         reg['X'] -= 1
         flags = set_flags(reg['X'])
         if flags['N']:
-            reg['X'] = reg['X'] + 256
+            reg['X'] += BYTE_SIZE
         return reg, flags
 
 
@@ -546,7 +548,7 @@ class DEY(BaseInstruction):
         reg['Y'] -= 1
         flags = set_flags(reg['Y'])
         if flags['N']:
-            reg['Y'] = reg['Y'] + 256
+            reg['Y'] += BYTE_SIZE
         return reg, flags
 
 
@@ -721,7 +723,7 @@ class BLA(BaseInstruction):
         reg['A'] = reg['A'] << 1
         flags = set_flags(reg['A'])
         if flags['O']:
-            reg['A'] %= 256
+            reg['A'] %= BYTE_SIZE
         return reg, flags
 
 
@@ -737,7 +739,7 @@ class BLX(BaseInstruction):
         reg['X'] = reg['X'] << 1
         flags = set_flags(reg['X'])
         if flags['O']:
-            reg['X'] %= 256
+            reg['X'] %= BYTE_SIZE
         return reg, flags
 
 
@@ -753,7 +755,7 @@ class BLY(BaseInstruction):
         reg['Y'] = reg['Y'] << 1
         flags = set_flags(reg['Y'])
         if flags['O']:
-            reg['Y'] %= 256
+            reg['Y'] %= BYTE_SIZE
         return reg, flags
 
 
