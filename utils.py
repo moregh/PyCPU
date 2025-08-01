@@ -19,12 +19,12 @@ def data_to_memory_location(data: list[int]) -> int:
     return (data[0] << 8) + data[1]
 
 
-def blank_flags() -> dict[str: bool]:
+def blank_flags() -> dict[str, bool]:
     """Returns a blank flag dictionary"""
     return BLANK_FLAGS
 
 
-def set_flags(value: int) -> dict[str: bool]:
+def set_flags(value: int) -> dict[str, bool]:
     """Returns a dict of flags set by the integer value supplied"""
     if value < 0:
         return NEGATIVE_FLAGS

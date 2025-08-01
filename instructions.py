@@ -807,7 +807,7 @@ These dictionary definitions MUST appear at the bottom of the file to ensure tha
 If you use the same opcode for multiple instructions, undefined behaviour may occur. It is recommended you use iota()
 to ensure an unused, sequential int is assigned to the opcode.
 """
-InstructionSet: dict[int, BaseInstruction] = {x[1].opcode: x[1]() for x in
+InstructionSet: dict[int, BaseInstruction] = {x[1].opcode: x[1] for x in
                                               inspect.getmembers(sys.modules[__name__], inspect.isclass)
                                               if hasattr(x[1], "opcode") and x[1].opcode > -1}
 
