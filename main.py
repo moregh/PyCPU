@@ -22,8 +22,7 @@ if __name__ == "__main__":
     # now open an example program which increments the registers sequentially
     cpu.reset()
     print(cpu)
-    # cpu.load_data(parse_file("examples/counters.cpu"))
-    cpu.load_data(parse_file("examples/rule110.cpu"))
+    cpu.load_data(parse_file("examples/counters.cpu"))
     while not cpu.halted:
         cpu.tick()
         # if cpu.TICKS % 1000000 == 0:
