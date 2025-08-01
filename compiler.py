@@ -1,0 +1,45 @@
+from instructions import NameToOpcode
+
+
+def read_file(filename: str) -> list[str]:
+    try:
+        with open(filename, "r") as f:
+            return f.readlines()
+    except IOError as e:
+        print(f"Could not open file: {e}")
+        return []
+
+
+def parse_line(line: str) -> tuple[int, int, int]:
+    parts = line.strip().split(" ")
+    if parts[0] == "":
+        return -1, -1, -1
+    if ";" in parts:
+        idx = parts.index(";")
+        parts = parts[:idx]
+        if not parts:
+            return -1, -1, -1
+    opcode = parts[0]
+    if opcode not in NameToOpcode:
+        print(f"Error parsing line: '{opcode}' not in Instruction Set")
+        return -1, -1, -1
+    if len(parts) == 3:
+        mem1, mem2 = parts[1:]
+    elif len(parts) == 2:
+        mem1, mem2 = parts[1], -1
+    else:
+        mem1, mem2 = -1, -1
+    return NameToOpcode.get(opcode, -1), int(mem1), int(mem2)
+
+
+def parsed_to_list(data: tuple[int, int, int]) -> list[int]:
+    return [x for x in data if x > -1]
+
+
+def parse_file(filename: str) -> list[int]:
+    program = []
+    lines = read_file(filename)
+    for line in lines:
+        program.extend(parsed_to_list(parse_line(line)))
+    return program
+

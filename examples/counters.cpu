@@ -1,0 +1,7 @@
+INA
+JNO 0 0
+INX
+JNO 0 0
+INY
+JNO 0 0
+HLT
