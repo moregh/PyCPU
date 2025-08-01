@@ -35,12 +35,12 @@ This is a list of all the pre-defined instructions available on the CPU.
 | SAX | 15 | 0 | Subtract A and X - Subtracts register X from register A and store the value in register A | N, Z |
 | SAY | 16 | 0 | Subtract A and Y - Subtracts register Y from register A and store the value in register A | N, Z |
 | SXY | 17 | 0 | Subtract X and Y - Subtracts register Y from register X and store the value in register X | N, Z |
-| CAX | 18 | 0 | Copy A to X - Copies A register into X register | None |
-| CAY | 19 | 0 | Copy A to Y - Copies A register into Y register | None |
-| CXY | 20 | 0 | Copy X to Y - Copies X register into Y register | None |
-| CYX | 21 | 0 | Copy Y to X - Copies Y register into X register | None |
-| CXA | 22 | 0 | Copy X to A - Copies X register into A register | None |
-| CYA | 23 | 0 | Copy Y to A - Copies Y register into A register | None |
+| CAX | 18 | 0 | Copy A to X - Copies A register into X register | Z |
+| CAY | 19 | 0 | Copy A to Y - Copies A register into Y register | Z |
+| CXY | 20 | 0 | Copy X to Y - Copies X register into Y register | Z |
+| CYX | 21 | 0 | Copy Y to X - Copies Y register into X register | Z |
+| CXA | 22 | 0 | Copy X to A - Copies X register into A register | Z |
+| CYA | 23 | 0 | Copy Y to A - Copies Y register into A register | Z |
 | JMP | 24 | 2 | Jump - Jump to specified memory location | None |
 | JNZ | 25 | 2 | Jump Not Zero - Jump to specified memory location if the Zero flag was not set during the last operation | None |
 | JMZ | 26 | 2 | Jump if Zero - Jump to specified memory location if the Zero flag was set during the last operation | None |
