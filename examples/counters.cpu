@@ -1,7 +1,12 @@
-INA
-JNO 0 0
-INX
-JNO 0 0
-INY
-JNO 0 0
-HLT
+; counters.cpu
+;
+; Increments registers until they overflow, then add 1 to the next
+; register and continue, starting with A, then X, then Y.
+;
+INA       ; Increment A
+JNO 0 0   ; If A did not overflow, go back to the start
+INX       ; A did overflow, increment X
+JNO 0 0   ; If X did not overflow, go back to the start
+INY       ; X did overflow, increment Y
+JNO 0 0   ; If Y did not overflow, go back to the start
+HLT       ; Y did overflow, halt the program

@@ -1,15 +1,19 @@
-LDY 14
-LDA 0
-LDX 1
-WMA 0 100
-AAX
-JMO 0 24
-RMX 0 100
-DEY
-JNZ 0 6
-RMY 0 200
-HLT
-RMX 0 200
-INX
-WMX 0 200
-JMP 0 12
+; fibonacci.cpu
+;
+; Calculates the 15th Fibonacci number
+;
+LDY 14              ; Loads the Y register with value 14
+LDA 0               ; Loads the A register with value 0
+LDX 1               ; Loads the X register with value 1
+WMA 0 100           ; Write value of register A to memory location 100
+AAX                 ; Adds A and X registers and stores in A register
+JMO 0 24            ; If A register overflowed, jump to memory location 24
+RMX 0 100           ; Load register X with value at memory location 100
+DEY                 ; Decrement register Y by 1
+JNZ 0 6             ; If Y is NOT zero (i.e. we're not finished), loop back to the start
+RMY 0 200           ; Load register Y with value at memory location 200
+HLT                 ; Halts the CPU
+RMX 0 200           ; Load register X with value at memory location 200
+INX                 ; Increment register X by 1
+WMX 0 200           ; Write value of register X to memory location 200
+JMP 0 12            ; Jump to memory location 12
