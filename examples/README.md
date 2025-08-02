@@ -5,8 +5,7 @@ Example software for the CPU
 This document contains annotated code snippets demonstrating how to perform certain tasks on
 the CPU. The individual files are available as [NAME].cpu within this folder.
 
-**NOTE**: Comments must be removed from the code before attempting to run it as these are
-not recognised by the compiler (yet).
+**NOTE**: Comments are prefixed using a semicolon and run to the end of the line.
 
 ## Fibonacci Sequence
 
@@ -16,21 +15,21 @@ Y (upper byte).
 ```commandline
 fibonacci.cpu
 
-LDY 14              # Loads the Y register with value 14
-LDA 0               # Loads the A register with value 0
-LDX 1               # Loads the X register with value 1
-WMA 0 100           # Write value of register A to memory location 100
-AAX                 # Adds A and X registers and stores in A register
-JMO 0 24            # If A register overflowed, jump to memory location 24
-RMX 0 100           # Load register X with value at memory location 100
-DEY                 # Decrement register Y by 1
-JNZ 0 6             # If Y is NOT zero (i.e. we're not finished), loop back to the start
-RMY 0 200           # Load register Y with value at memory location 200
-HLT                 # Halts the CPU
-RMX 0 200           # Load register X with value at memory location 200
-INX                 # Increment register X by 1
-WMX 0 200           # Write value of register X to memory location 200
-JMP 0 12            # Jump to memory location 12
+LDY 14              ; Loads the Y register with value 14
+LDA 0               ; Loads the A register with value 0
+LDX 1               ; Loads the X register with value 1
+WMA 0 100           ; Write value of register A to memory location 100
+AAX                 ; Adds A and X registers and stores in A register
+JMO 0 24            ; If A register overflowed, jump to memory location 24
+RMX 0 100           ; Load register X with value at memory location 100
+DEY                 ; Decrement register Y by 1
+JNZ 0 6             ; If Y is NOT zero (i.e. we're not finished), loop back to the start
+RMY 0 200           ; Load register Y with value at memory location 200
+HLT                 ; Halts the CPU
+RMX 0 200           ; Load register X with value at memory location 200
+INX                 ; Increment register X by 1
+WMX 0 200           ; Write value of register X to memory location 200
+JMP 0 12            ; Jump to memory location 12
 ```
 The above code is made up of 4 distinct sections:
 - initialisation
@@ -40,9 +39,9 @@ The above code is made up of 4 distinct sections:
 
 #### Initialisation
 ```commandline
-LDY 14              # Loads the Y register with value 14
-LDA 0               # Loads the A register with value 0
-LDX 1               # Loads the X register with value 1
+LDY 14              ; Loads the Y register with value 14
+LDA 0               ; Loads the A register with value 0
+LDX 1               ; Loads the X register with value 1
 ```
 This sets the initial status of the registers ready to perform a loop. We want the 15th
 Fibonacci number, but load Y with *15 - 1 = 14* because we start with the 0th Fibonacci 
@@ -51,12 +50,12 @@ register will be used for holding previous numbers, and Y register is the loop c
 
 #### Main Loop
 ```commandline
-WMA 0 100           # Write value of register A to memory location 100
-AAX                 # Adds A and X registers and stores in A register
-JMO 0 24            # If A register overflowed, jump to memory location 24
-RMX 0 100           # Load register X with value at memory location 100
-DEY                 # Decrement register Y by 1
-JNZ 0 6             # If Y is NOT zero (i.e. we're not finished), loop back to the start
+WMA 0 100           ; Write value of register A to memory location 100
+AAX                 ; Adds A and X registers and stores in A register
+JMO 0 24            ; If A register overflowed, jump to memory location 24
+RMX 0 100           ; Load register X with value at memory location 100
+DEY                 ; Decrement register Y by 1
+JNZ 0 6             ; If Y is NOT zero (i.e. we're not finished), loop back to the start
 ```
 This is where the actual calculation takes place. We store the value of the A register in to
 memory location 100 so we can use it later. Then we add the values of the A and X registers
@@ -70,18 +69,18 @@ location 6. If it is zero, we carry on to the next section.
 
 #### Completion and Output
 ```commandline
-RMY 0 200           # Load register Y with value at memory location 200
-HLT                 # Halts the CPU
+RMY 0 200           ; Load register Y with value at memory location 200
+HLT                 ; Halts the CPU
 ```
 The number of times the A register overflowed has been stored in memory location 200, so we
 now read this back from memory into the Y register. Then we are complete, so halt the CPU.
 
 #### Overflow Handling
 ```commandline
-RMX 0 200           # Load register X with value at memory location 200
-INX                 # Increment register X by 1
-WMX 0 200           # Write value of register X to memory location 200
-JMP 0 12            # Jump to memory location 12
+RMX 0 200           ; Load register X with value at memory location 200
+INX                 ; Increment register X by 1
+WMX 0 200           ; Write value of register X to memory location 200
+JMP 0 12            ; Jump to memory location 12
 ```
 We load the value from memory location which holds the number of times we have overflowed in
 to the X register. We then increment the X register by 1, save it back to memory location
