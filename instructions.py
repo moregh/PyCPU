@@ -798,6 +798,84 @@ class BRY(BaseInstruction):
         return reg, set_flags(reg['Y'])
 
 
+class JFA(BaseInstruction):
+    """
+    Jump Forward A - sets PC to its current value plus the value of the A register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] + reg['A']) % len(ram)
+        return reg, BLANK_FLAGS
+
+
+class JFX(BaseInstruction):
+    """
+    Jump Forward X - sets PC to its current value plus the value of the X register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] + reg['X']) % len(ram)
+        return reg, BLANK_FLAGS
+
+
+class JFY(BaseInstruction):
+    """
+    Jump Forward Y - sets PC to its current value plus the value of the Y register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] + reg['Y']) % len(ram)
+        return reg, BLANK_FLAGS
+    
+
+class JBA(BaseInstruction):
+    """
+    Jump Backward A - sets PC to its current value minus the value of the A register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] - reg['A']) % len(ram)
+        return reg, BLANK_FLAGS
+
+
+class JBX(BaseInstruction):
+    """
+    Jump Backward X - sets PC to its current value minus the value of the X register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] - reg['X']) % len(ram)
+        return reg, BLANK_FLAGS
+
+
+class JBY(BaseInstruction):
+    """
+    Jump Backward Y - sets PC to its current value minus the value of the Y register (wraps around memory)
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
+        reg['PC'] = (reg['PC'] - reg['Y']) % len(ram)
+        return reg, BLANK_FLAGS
+
+
 """
 ***********************************************************************************************************************
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * WARNING * * * * * * * * * * * * * * * * * * * * * * * * * * * *

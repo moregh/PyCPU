@@ -72,7 +72,12 @@ This is a list of all the pre-defined instructions available on the CPU.
 | BRA | 52 | 0 | Bit Shift Right A - Bit-shift A register right by 1 (half) | Z |
 | BRX | 53 | 0 | Bit Shift Right X - Bit-shift X register right by 1 (half) | Z |
 | BRY | 54 | 0 | Bit Shift Right Y - Bit-shift Y register right by 1 (half) | Z |
-
+| JFA | 55 | 0 | Jump Forward A - sets PC to its current value plus the value of the A register (wraps around memory) | None |
+| JFX | 56 | 0 | Jump Forward X - sets PC to its current value plus the value of the X register (wraps around memory) | None |
+| JFY | 57 | 0 | Jump Forward Y - sets PC to its current value plus the value of the Y register (wraps around memory) | None |
+| JBA | 58 | 0 | Jump Backward A - sets PC to its current value minus the value of the A register (wraps around memory) | None |
+| JBX | 59 | 0 | Jump Backward X - sets PC to its current value minus the value of the X register (wraps around memory) | None |
+| JBY | 60 | 0 | Jump Backward Y - sets PC to its current value minus the value of the Y register (wraps around memory) | None |
 
 ## Add Instructions
 
