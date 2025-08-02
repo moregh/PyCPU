@@ -1,8 +1,11 @@
-BLANK_FLAGS = {'Z': False, 'O': False, 'H': False, 'N': False}
-ZERO_FLAGS = {'Z': True, 'O': False, 'H': False, 'N': False}
-OVERFLOW_FLAGS = {'Z': False, 'O': True, 'H': False, 'N': False}
-NEGATIVE_FLAGS = {'Z': False, 'O': False, 'H': False, 'N': True}
-OVER_ZERO_FLAGS = {'Z': True, 'O': True, 'H': False, 'N': False}
+from typ import Flags, Registers, Data
+
+
+BLANK_FLAGS:     Flags = {'Z': False, 'O': False, 'H': False, 'N': False}
+ZERO_FLAGS:      Flags = {'Z': True,  'O': False, 'H': False, 'N': False}
+OVERFLOW_FLAGS:  Flags = {'Z': False, 'O': True,  'H': False, 'N': False}
+NEGATIVE_FLAGS:  Flags = {'Z': False, 'O': False, 'H': False, 'N': True }
+OVER_ZERO_FLAGS: Flags = {'Z': True,  'O': True,  'H': False, 'N': False}
 
 
 def build_readme() -> str:
@@ -15,17 +18,17 @@ def build_readme() -> str:
     return output
 
 
-def data_to_memory_location(data: list[int]) -> int:
+def data_to_memory_location(data: Data) -> int:
     """Converts a length 2 list of ints to a single int"""
     return (data[0] << 8) + data[1]
 
 
-def blank_flags() -> dict[str, bool]:
+def blank_flags() -> Flags:
     """Returns a blank flag dictionary"""
     return BLANK_FLAGS
 
 
-def set_flags(value: int) -> dict[str, bool]:
+def set_flags(value: int) -> Flags:
     """Returns a dict of flags set by the integer value supplied"""
     if value < 0:
         return NEGATIVE_FLAGS

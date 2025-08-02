@@ -1,5 +1,5 @@
 from instructions import BaseInstruction, InstructionSet
-from typ import Flags, Registers
+from typ import Flags, Registers, Data
 from display import Display
 
 
@@ -10,7 +10,7 @@ MAX_RAM_SIZE = 64 * 1024  # 64KB max for 16-bit address space
 class CPU:
     def __init__(self, ram_size: int = MAX_RAM_SIZE, gpu: Display|None = None) -> None:
         self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size))  # Clamp RAM size between 4KB-64KB
-        self.RAM: list[int] = [0 for _ in range(self.RAM_SIZE)]
+        self.RAM: Data = [0 for _ in range(self.RAM_SIZE)]
         self.GPU: Display|None = gpu
         # General Purpose Registers
         self.REG: Registers = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
@@ -46,15 +46,15 @@ class CPU:
         self.REG['PC'] = (self.REG['PC'] + 1) % self.RAM_SIZE  # Modulo length of RAM to wrap when required
         return data
 
-    def decode(self, opcode: int) -> tuple[BaseInstruction, list[int]]:
+    def decode(self, opcode: int) -> tuple[BaseInstruction, Data]:
         try:
             instruction: BaseInstruction = InstructionSet[opcode] # type: ignore
         except KeyError:
             instruction: BaseInstruction = InstructionSet[0]  # type: ignore # Default to HLT instruction if invalid data is found
-        data: list[int] = [self.fetch() for _ in range(instruction.length)]
+        data: Data = [self.fetch() for _ in range(instruction.length)]
         return instruction, data
 
-    def execute(self, instruction: BaseInstruction, data: list[int]) -> None:
+    def execute(self, instruction: BaseInstruction, data: Data) -> None:
         self.REG, self.FLAGS = instruction.run(self.REG, self.FLAGS, data, self.RAM)
 
     def reset(self) -> None:
@@ -62,7 +62,7 @@ class CPU:
         self.FLAGS: dict[str, bool] = {'Z': False, 'O': False, 'H': False, 'N': False}
         self.RAM = [0 for _ in range(self.RAM_SIZE)]
 
-    def load_data(self, data: list[int], offset: int = 0) -> None:
+    def load_data(self, data: Data, offset: int = 0) -> None:
         for i, d in enumerate(data):
             self.RAM[(i + offset) % self.RAM_SIZE] = d  # Mod by length of RAM to wrap round if required
 

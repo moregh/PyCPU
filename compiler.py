@@ -1,4 +1,5 @@
 from instructions import NameToOpcode, OpcodeToName
+from typ import Data
 
 
 def read_file(filename: str) -> list[str]:
@@ -30,14 +31,13 @@ def parse_line(line: str) -> tuple[int, int, int]:
     return NameToOpcode.get(opcode, -1), int(mem1), int(mem2)
 
 
-def parsed_to_list(data: tuple[int, int, int]) -> list[int]:
+def parsed_to_list(data: tuple[int, int, int]) -> Data:
     return [x for x in data if x > -1]
 
 
-def parse_file(filename: str) -> list[int]:
+def parse_file(filename: str) -> Data:
     program = []
     lines = read_file(filename)
     for line in lines:
         program.extend(parsed_to_list(parse_line(line)))
     return program
-
