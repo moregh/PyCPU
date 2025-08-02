@@ -4,13 +4,18 @@ from display import Display
 from utils import BLANK_FLAGS
 
 
-MIN_RAM_SIZE = 4096       # 4KB ensures enough for 80x50 character display
-MAX_RAM_SIZE = 64 * 1024  # 64KB max for 16-bit address space
+MIN_RAM_SIZE = 4       # 4KB ensures enough for 80x50 character display
+MAX_RAM_SIZE = 64      # 64KB max for 16-bit address space
 
 
 class CPU:
     def __init__(self, ram_size: int = MAX_RAM_SIZE, gpu: Display|None = None) -> None:
-        self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size))  # Clamp RAM size between 4KB-64KB
+        """
+        Initializes the CPU with a specified RAM size and an optional GPU.
+        :param ram_size: RAM size in KB, range: 4 - 64, default: 64
+        :param gpu: Optional Display object for GPU functionality.
+        """
+        self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size)) * 1024 # Clamp RAM size between 4KB-64KB
         self.RAM: Data = [0] * self.RAM_SIZE
         self.GPU: Display|None = gpu
         # General Purpose Registers
