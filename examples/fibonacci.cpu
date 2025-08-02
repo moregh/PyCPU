@@ -16,4 +16,4 @@ HLT                 ; Halts the CPU
 RMX 0 200           ; Load register X with value at memory location 200
 INX                 ; Increment register X by 1
 WMX 0 200           ; Write value of register X to memory location 200
-JMP 0 12            ; Jump to memory location 12
+JMP 0 13            ; Jump to memory location 13
