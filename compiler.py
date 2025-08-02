@@ -1,4 +1,4 @@
-from instructions import NameToOpcode
+from instructions import NameToOpcode, OpcodeToName
 
 
 def read_file(filename: str) -> list[str]:
@@ -11,15 +11,13 @@ def read_file(filename: str) -> list[str]:
 
 
 def parse_line(line: str) -> tuple[int, int, int]:
-    parts = line.strip().split(" ")
-    if parts[0] == "":
-        return -1, -1, -1
+    parts = [x for x in line.strip().split(" ") if x != ""]
     if ";" in parts:
-        idx = parts.index(";")
-        parts = parts[:idx]
-        if not parts:
-            return -1, -1, -1
-    opcode = parts[0]
+        parts = parts[:parts.index(";")]
+    if parts:
+        opcode = parts[0]
+    else:
+        return -1, -1, -1
     if opcode not in NameToOpcode:
         print(f"Error parsing line: '{opcode}' not in Instruction Set")
         return -1, -1, -1

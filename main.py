@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from cpu import CPU
 from compiler import parse_file
+from display import Display
 
 
 if __name__ == "__main__":
@@ -29,4 +30,3 @@ if __name__ == "__main__":
             print(cpu)
     print(cpu) 
     # this should finish after 33,686,020 ticks.
-
