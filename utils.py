@@ -2,6 +2,7 @@ BLANK_FLAGS = {'Z': False, 'O': False, 'H': False, 'N': False}
 ZERO_FLAGS = {'Z': True, 'O': False, 'H': False, 'N': False}
 OVERFLOW_FLAGS = {'Z': False, 'O': True, 'H': False, 'N': False}
 NEGATIVE_FLAGS = {'Z': False, 'O': False, 'H': False, 'N': True}
+OVER_ZERO_FLAGS = {'Z': True, 'O': True, 'H': False, 'N': False}
 
 
 def build_readme() -> str:
@@ -31,5 +32,7 @@ def set_flags(value: int) -> dict[str, bool]:
     elif value == 0:
         return ZERO_FLAGS
     elif value > 255:
+        if value == 256:
+            return ZERO_FLAGS
         return OVERFLOW_FLAGS
     return BLANK_FLAGS
