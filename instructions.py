@@ -15,6 +15,18 @@ def iota() -> int:
     return IOTA - 1
 
 
+def safe_add(value: int) -> tuple[int, Flags]:
+    flags = set_flags(value)
+    return value % BYTE_SIZE, flags
+
+
+def safe_sub(value: int) -> tuple[int, Flags]:
+    flags = set_flags(value)
+    if value < 0:
+        value += BYTE_SIZE
+    return value, flags
+
+
 class BaseInstruction(ABC):
     """Base Instruction
 
@@ -200,9 +212,7 @@ class AAX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] += reg['X']
-        flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % BYTE_SIZE
+        reg['A'], flags = safe_add(reg['A'] + reg['X'])
         return reg, flags
 
 
@@ -215,9 +225,7 @@ class AAY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] += reg['Y']
-        flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % BYTE_SIZE
+        reg['A'], flags = safe_add(reg['A'] + reg['Y'])
         return reg, flags
 
 
@@ -230,9 +238,7 @@ class AXY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['X'] += reg['Y']
-        flags = set_flags(reg['X'])
-        reg['X'] = reg['X'] % BYTE_SIZE
+        reg['X'], flags = safe_add(reg['X'] + reg['Y'])
         return reg, flags
 
 
@@ -245,10 +251,7 @@ class SAX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] -= reg['X']
-        flags = set_flags(reg['A'])
-        if reg['A'] < 0:
-            reg['A'] += BYTE_SIZE
+        reg['A'], flags = safe_sub(reg['A'] - reg['X'])
         return reg, flags
 
 
@@ -261,10 +264,7 @@ class SAY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] -= reg['Y']
-        flags = set_flags(reg['A'])
-        if reg['A'] < 0:
-            reg['A'] += BYTE_SIZE
+        reg['A'], flags = safe_sub(reg['A'] - reg['Y'])
         return reg, flags
 
 
@@ -277,10 +277,7 @@ class SXY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['X'] -= reg['Y']
-        flags = set_flags(reg['X'])
-        if reg['X'] < 0:
-            reg['X'] += BYTE_SIZE
+        reg['X'], flags = safe_sub(reg['X'] - reg['Y'])
         return reg, flags
 
 
@@ -468,9 +465,7 @@ class INA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] += 1
-        flags = set_flags(reg['A'])
-        reg['A'] = reg['A'] % BYTE_SIZE
+        reg['A'], flags = safe_add(reg['A'] + 1)
         return reg, flags
 
 
@@ -483,9 +478,7 @@ class INX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['X'] += 1
-        flags = set_flags(reg['X'])
-        reg['X'] = reg['X'] % BYTE_SIZE
+        reg['X'], flags = safe_add(reg['X'] + 1)
         return reg, flags
 
 
@@ -498,9 +491,7 @@ class INY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['Y'] += 1
-        flags = set_flags(reg['Y'])
-        reg['Y'] = reg['Y'] % BYTE_SIZE
+        reg['Y'], flags = safe_add(reg['Y'] + 1)
         return reg, flags
 
 
@@ -513,10 +504,7 @@ class DEA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] -= 1
-        flags = set_flags(reg['A'])
-        if flags['N']:
-            reg['A'] += BYTE_SIZE
+        reg['A'], flags = safe_sub(reg['A'] - 1)
         return reg, flags
 
 
@@ -529,10 +517,7 @@ class DEX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['X'] -= 1
-        flags = set_flags(reg['X'])
-        if flags['N']:
-            reg['X'] += BYTE_SIZE
+        reg['X'], flags = safe_sub(reg['X'] - 1)
         return reg, flags
 
 
@@ -545,10 +530,7 @@ class DEY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['Y'] -= 1
-        flags = set_flags(reg['Y'])
-        if flags['N']:
-            reg['Y'] += BYTE_SIZE
+        reg['Y'], flags = safe_sub(reg['Y'] - 1)
         return reg, flags
 
 
@@ -720,10 +702,7 @@ class BLA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['A'] = reg['A'] << 1
-        flags = set_flags(reg['A'])
-        if flags['O']:
-            reg['A'] %= BYTE_SIZE
+        reg['A'], flags = safe_add(reg['A'] << 1)
         return reg, flags
 
 
@@ -736,10 +715,7 @@ class BLX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['X'] = reg['X'] << 1
-        flags = set_flags(reg['X'])
-        if flags['O']:
-            reg['X'] %= BYTE_SIZE
+        reg['X'], flags = safe_add(reg['X'] << 1)
         return reg, flags
 
 
@@ -752,10 +728,7 @@ class BLY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
-        reg['Y'] = reg['Y'] << 1
-        flags = set_flags(reg['Y'])
-        if flags['O']:
-            reg['Y'] %= BYTE_SIZE
+        reg['Y'], flags = safe_add(reg['Y'] << 1)
         return reg, flags
 
 
