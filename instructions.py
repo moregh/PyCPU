@@ -2,7 +2,7 @@ from utils import set_flags, data_to_memory_location, BLANK_FLAGS
 from abc import ABC, abstractmethod
 import inspect
 import sys
-
+from typ import Flags, Registers
 
 BYTE_SIZE = 256
 
@@ -26,7 +26,7 @@ class BaseInstruction(ABC):
 
     @staticmethod
     @abstractmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         pass
 
 
@@ -38,7 +38,7 @@ class HLT(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         flags['H'] = True
         return reg, flags
 
@@ -51,7 +51,7 @@ class CLR(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = reg['X'] = reg['Y'] = 0
         return reg, BLANK_FLAGS
 
@@ -64,7 +64,7 @@ class NOP(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         return reg, BLANK_FLAGS
 
 
@@ -76,7 +76,7 @@ class LDA(BaseInstruction):
     length: int = 1
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = data[0]
         return reg, BLANK_FLAGS
 
@@ -89,7 +89,7 @@ class LDX(BaseInstruction):
     length: int = 1
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] = data[0]
         return reg, BLANK_FLAGS
 
@@ -102,7 +102,7 @@ class LDY(BaseInstruction):
     length: int = 1
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] = data[0]
         return reg, BLANK_FLAGS
 
@@ -115,7 +115,7 @@ class WMA(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['A']
         return reg, BLANK_FLAGS
@@ -129,7 +129,7 @@ class WMX(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['X']
         return reg, BLANK_FLAGS
@@ -143,7 +143,7 @@ class WMY(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         ram[location] = reg['Y']
         return reg, BLANK_FLAGS
@@ -157,7 +157,7 @@ class RMA(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         reg['A'] = ram[location]
         return reg, BLANK_FLAGS
@@ -171,7 +171,7 @@ class RMX(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         reg['X'] = ram[location]
         return reg, BLANK_FLAGS
@@ -185,7 +185,7 @@ class RMY(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         location = data_to_memory_location(data) % len(ram)
         reg['Y'] = ram[location]
         return reg, BLANK_FLAGS
@@ -199,7 +199,7 @@ class AAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] += reg['X']
         flags = set_flags(reg['A'])
         reg['A'] = reg['A'] % BYTE_SIZE
@@ -214,7 +214,7 @@ class AAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] += reg['Y']
         flags = set_flags(reg['A'])
         reg['A'] = reg['A'] % BYTE_SIZE
@@ -229,7 +229,7 @@ class AXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] += reg['Y']
         flags = set_flags(reg['X'])
         reg['X'] = reg['X'] % BYTE_SIZE
@@ -244,7 +244,7 @@ class SAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] -= reg['X']
         flags = set_flags(reg['A'])
         if reg['A'] < 0:
@@ -260,7 +260,7 @@ class SAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] -= reg['Y']
         flags = set_flags(reg['A'])
         if reg['A'] < 0:
@@ -276,7 +276,7 @@ class SXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] -= reg['Y']
         flags = set_flags(reg['X'])
         if reg['X'] < 0:
@@ -292,7 +292,7 @@ class CAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] = reg['A']
         return reg, set_flags(reg['X'])
 
@@ -305,7 +305,7 @@ class CAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] = reg['A']
         return reg, set_flags(reg['Y'])
 
@@ -318,7 +318,7 @@ class CXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] = reg['X']
         return reg, set_flags(reg['Y'])
 
@@ -331,7 +331,7 @@ class CYX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] = reg['Y']
         return reg, set_flags(reg['X'])
 
@@ -344,7 +344,7 @@ class CXA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = reg['X']
         return reg, set_flags(reg['A'])
 
@@ -357,7 +357,7 @@ class CYA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = reg['Y']
         return reg, set_flags(reg['A'])
 
@@ -370,7 +370,7 @@ class JMP(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
 
@@ -383,7 +383,7 @@ class JNZ(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if not flags['Z']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -397,7 +397,7 @@ class JMZ(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if flags['Z']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -411,7 +411,7 @@ class JNN(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if not flags['N']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -425,7 +425,7 @@ class JMN(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if flags['N']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -439,7 +439,7 @@ class JNO(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if not flags['O']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -453,7 +453,7 @@ class JMO(BaseInstruction):
     length: int = 2
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if flags['O']:
             reg['PC'] = data_to_memory_location(data)
         return reg, BLANK_FLAGS
@@ -467,7 +467,7 @@ class INA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] += 1
         flags = set_flags(reg['A'])
         reg['A'] = reg['A'] % BYTE_SIZE
@@ -482,7 +482,7 @@ class INX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] += 1
         flags = set_flags(reg['X'])
         reg['X'] = reg['X'] % BYTE_SIZE
@@ -497,7 +497,7 @@ class INY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] += 1
         flags = set_flags(reg['Y'])
         reg['Y'] = reg['Y'] % BYTE_SIZE
@@ -512,7 +512,7 @@ class DEA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] -= 1
         flags = set_flags(reg['A'])
         if flags['N']:
@@ -528,7 +528,7 @@ class DEX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] -= 1
         flags = set_flags(reg['X'])
         if flags['N']:
@@ -544,7 +544,7 @@ class DEY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] -= 1
         flags = set_flags(reg['Y'])
         if flags['N']:
@@ -560,7 +560,7 @@ class EAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if reg['A'] != reg['X']:
             return reg, BLANK_FLAGS
         return reg, set_flags(0)
@@ -574,7 +574,7 @@ class EAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if reg['A'] != reg['Y']:
             return reg, BLANK_FLAGS
         return reg, set_flags(0)
@@ -588,7 +588,7 @@ class EXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         if reg['X'] != reg['Y']:
             return reg, BLANK_FLAGS
         return reg, set_flags(0)
@@ -602,7 +602,7 @@ class NAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] &= reg['X']
         return reg, set_flags(reg['A'])
 
@@ -615,7 +615,7 @@ class NAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] &= reg['Y']
         return reg, set_flags(reg['A'])
 
@@ -628,7 +628,7 @@ class NXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] &= reg['Y']
         return reg, set_flags(reg['X'])
 
@@ -641,7 +641,7 @@ class OAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] |= reg['X']
         return reg, set_flags(reg['A'])
 
@@ -654,7 +654,7 @@ class OAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] |= reg['Y']
         return reg, set_flags(reg['A'])
 
@@ -667,7 +667,7 @@ class OXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] |= reg['Y']
         return reg, set_flags(reg['X'])
 
@@ -680,7 +680,7 @@ class XAX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] ^= reg['X']
         return reg, set_flags(reg['A'])
 
@@ -693,7 +693,7 @@ class XAY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] ^= reg['Y']
         return reg, set_flags(reg['A'])
 
@@ -706,7 +706,7 @@ class XXY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] ^= reg['Y']
         return reg, set_flags(reg['X'])
 
@@ -719,7 +719,7 @@ class BLA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = reg['A'] << 1
         flags = set_flags(reg['A'])
         if flags['O']:
@@ -735,7 +735,7 @@ class BLX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] = reg['X'] << 1
         flags = set_flags(reg['X'])
         if flags['O']:
@@ -751,7 +751,7 @@ class BLY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] = reg['Y'] << 1
         flags = set_flags(reg['Y'])
         if flags['O']:
@@ -767,7 +767,7 @@ class BRA(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['A'] = reg['A'] >> 1
         return reg, set_flags(reg['A'])
 
@@ -780,7 +780,7 @@ class BRX(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['X'] = reg['X'] >> 1
         return reg, set_flags(reg['X'])
 
@@ -793,7 +793,7 @@ class BRY(BaseInstruction):
     length: int = 0
 
     @staticmethod
-    def run(reg: dict[str, int], flags: dict[str, bool], data: list[int], ram: list[int]) -> tuple[dict, dict]:
+    def run(reg: Registers, flags: Flags, data: list[int], ram: list[int]) -> tuple[Registers, Flags]:
         reg['Y'] = reg['Y'] >> 1
         return reg, set_flags(reg['Y'])
 
