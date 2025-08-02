@@ -15,15 +15,9 @@ def iota() -> int:
     return IOTA - 1
 
 
-def safe_add(value: int) -> tuple[int, Flags]:
+def validate(value: int) -> tuple[int, Flags]:
     flags = set_flags(value)
-    return value % BYTE_SIZE, flags
-
-
-def safe_sub(value: int) -> tuple[int, Flags]:
-    flags = set_flags(value)
-    value = value % BYTE_SIZE
-    return value, flags
+    return value & (BYTE_SIZE - 1), flags
 
 
 class BaseInstruction(ABC):
@@ -126,7 +120,7 @@ class WMA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         ram[location] = reg['A']
         return reg, BLANK_FLAGS
 
@@ -140,7 +134,7 @@ class WMX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         ram[location] = reg['X']
         return reg, BLANK_FLAGS
 
@@ -154,7 +148,7 @@ class WMY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         ram[location] = reg['Y']
         return reg, BLANK_FLAGS
 
@@ -168,7 +162,7 @@ class RMA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         reg['A'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -182,7 +176,7 @@ class RMX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         reg['X'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -196,7 +190,7 @@ class RMY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        location = data_to_memory_location(data) % len(ram)
+        location = data_to_memory_location(data) & (len(ram) - 1)
         reg['Y'] = ram[location]
         return reg, BLANK_FLAGS
 
@@ -210,7 +204,7 @@ class AAX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_add(reg['A'] + reg['X'])
+        reg['A'], flags = validate(reg['A'] + reg['X'])
         return reg, flags
 
 
@@ -223,7 +217,7 @@ class AAY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_add(reg['A'] + reg['Y'])
+        reg['A'], flags = validate(reg['A'] + reg['Y'])
         return reg, flags
 
 
@@ -236,7 +230,7 @@ class AXY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['X'], flags = safe_add(reg['X'] + reg['Y'])
+        reg['X'], flags = validate(reg['X'] + reg['Y'])
         return reg, flags
 
 
@@ -249,7 +243,7 @@ class SAX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_sub(reg['A'] - reg['X'])
+        reg['A'], flags = validate(reg['A'] - reg['X'])
         return reg, flags
 
 
@@ -262,7 +256,7 @@ class SAY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_sub(reg['A'] - reg['Y'])
+        reg['A'], flags = validate(reg['A'] - reg['Y'])
         return reg, flags
 
 
@@ -275,7 +269,7 @@ class SXY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['X'], flags = safe_sub(reg['X'] - reg['Y'])
+        reg['X'], flags = validate(reg['X'] - reg['Y'])
         return reg, flags
 
 
@@ -463,7 +457,7 @@ class INA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_add(reg['A'] + 1)
+        reg['A'], flags = validate(reg['A'] + 1)
         return reg, flags
 
 
@@ -476,7 +470,7 @@ class INX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['X'], flags = safe_add(reg['X'] + 1)
+        reg['X'], flags = validate(reg['X'] + 1)
         return reg, flags
 
 
@@ -489,7 +483,7 @@ class INY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['Y'], flags = safe_add(reg['Y'] + 1)
+        reg['Y'], flags = validate(reg['Y'] + 1)
         return reg, flags
 
 
@@ -502,7 +496,7 @@ class DEA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_sub(reg['A'] - 1)
+        reg['A'], flags = validate(reg['A'] - 1)
         return reg, flags
 
 
@@ -515,7 +509,7 @@ class DEX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['X'], flags = safe_sub(reg['X'] - 1)
+        reg['X'], flags = validate(reg['X'] - 1)
         return reg, flags
 
 
@@ -528,7 +522,7 @@ class DEY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['Y'], flags = safe_sub(reg['Y'] - 1)
+        reg['Y'], flags = validate(reg['Y'] - 1)
         return reg, flags
 
 
@@ -700,7 +694,7 @@ class BLA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['A'], flags = safe_add(reg['A'] << 1)
+        reg['A'], flags = validate(reg['A'] << 1)
         return reg, flags
 
 
@@ -713,7 +707,7 @@ class BLX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['X'], flags = safe_add(reg['X'] << 1)
+        reg['X'], flags = validate(reg['X'] << 1)
         return reg, flags
 
 
@@ -726,7 +720,7 @@ class BLY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['Y'], flags = safe_add(reg['Y'] << 1)
+        reg['Y'], flags = validate(reg['Y'] << 1)
         return reg, flags
 
 
@@ -778,7 +772,7 @@ class JFA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] + reg['A']) % len(ram)
+        reg['PC'] = (reg['PC'] + reg['A']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
 
 
@@ -791,7 +785,7 @@ class JFX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] + reg['X']) % len(ram)
+        reg['PC'] = (reg['PC'] + reg['X']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
 
 
@@ -804,7 +798,7 @@ class JFY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] + reg['Y']) % len(ram)
+        reg['PC'] = (reg['PC'] + reg['Y']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
     
 
@@ -817,7 +811,7 @@ class JBA(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] - reg['A']) % len(ram)
+        reg['PC'] = (reg['PC'] - reg['A']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
 
 
@@ -830,7 +824,7 @@ class JBX(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] - reg['X']) % len(ram)
+        reg['PC'] = (reg['PC'] - reg['X']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
 
 
@@ -843,7 +837,7 @@ class JBY(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        reg['PC'] = (reg['PC'] - reg['Y']) % len(ram)
+        reg['PC'] = (reg['PC'] - reg['Y']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
 
 
