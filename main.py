@@ -25,6 +25,8 @@ if __name__ == "__main__":
     cpu.load_data(parse_file("examples/counters.cpu"))
     while not cpu.halted:
         cpu.tick()
-        # if cpu.TICKS % 1000000 == 0:
-        print(cpu)
+        if cpu.TICKS % 1000000 == 0:
+            print(cpu)
+    print(cpu) 
+    # this should finish after 33,686,020 ticks.
 

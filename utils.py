@@ -10,7 +10,7 @@ def build_readme() -> str:
     from instructions import InstructionSet
     output = "| Name | Opcode | Length | Description | Flags |"
     for instr in (sorted(InstructionSet.values(), key=operator.attrgetter('opcode'))):
-        output += f"\n| {str(instr)[21:-2]} | {instr.opcode} | {instr.length} | {instr.__doc__.strip()} | None |"
+        output += f"\n| {str(instr)[21:-2]} | {instr.opcode} | {instr.length} | {instr.__doc__.strip()} | None |" # type: ignore
     return output
 
 

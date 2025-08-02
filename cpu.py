@@ -1,12 +1,12 @@
 from instructions import BaseInstruction, InstructionSet
 from display import Display
 
-
+MIN_RAM_SIZE = 4096       # 4KB ensures enough for 80x50 character display
 MAX_RAM_SIZE = 64 * 1024  # 64KB for 16-bit address space
 
 class CPU:
     def __init__(self, ram_size: int = MAX_RAM_SIZE, gpu: Display|None = None) -> None:
-        self.RAM_SIZE: int = min(MAX_RAM_SIZE, ram_size)  # Clamp RAM size to 64KB for 16-bit address space
+        self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size))  # Clamp RAM size to 64KB for 16-bit address space
         self.RAM: list[int] = [0 for _ in range(self.RAM_SIZE)]
         self.GPU: Display|None = gpu
         # General Purpose Registers
@@ -34,7 +34,7 @@ class CPU:
         self.execute(instruction, data)
         # Increment counter
         self.TICKS += 1
-        # Handle GPU buffering
+        # Handle GPU if required
         if self.GPU:
             self.GPU.draw(self.RAM[self.GPU_OFFSET:])
 
@@ -45,9 +45,9 @@ class CPU:
 
     def decode(self, opcode: int) -> tuple[BaseInstruction, list[int]]:
         try:
-            instruction: BaseInstruction = InstructionSet[opcode]
+            instruction: BaseInstruction = InstructionSet[opcode] # type: ignore
         except KeyError:
-            instruction: BaseInstruction = InstructionSet[0]  # Default to NOP instruction if invalid data is found
+            instruction: BaseInstruction = InstructionSet[0]  # type: ignore # Default to HLT instruction if invalid data is found
         data: list[int] = [self.fetch() for _ in range(instruction.length)]
         return instruction, data
 

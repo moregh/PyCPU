@@ -798,7 +798,7 @@ class BRY(BaseInstruction):
         return reg, set_flags(reg['Y'])
 
 
-"""'''
+"""
 ***********************************************************************************************************************
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * WARNING * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 ***********************************************************************************************************************
@@ -807,15 +807,12 @@ These dictionary definitions MUST appear at the bottom of the file to ensure tha
 If you use the same opcode for multiple instructions, undefined behaviour may occur. It is recommended you use iota()
 to ensure an unused, sequential int is assigned to the opcode.
 """
-InstructionSet: dict[int, BaseInstruction] = {x[1].opcode: x[1] for x in
-                                              inspect.getmembers(sys.modules[__name__], inspect.isclass)
-                                              if hasattr(x[1], "opcode") and x[1].opcode > -1}
+InstructionSet: dict[int, type] = {}
+NameToOpcode: dict[str, int] = {}
+OpcodeToName: dict[int, str] = {}
 
-NameToOpcode: dict[str, int] = {str(x[1])[21:-2]: x[1].opcode for x in
-                                inspect.getmembers(sys.modules[__name__], inspect.isclass)
-                                if hasattr(x[1], "opcode") and x[1].opcode > -1}
-
-
-OpcodeToName: dict[int, str] = {x[1].opcode: str(x[1])[21:-2] for x in
-                                inspect.getmembers(sys.modules[__name__], inspect.isclass)
-                                if hasattr(x[1], "opcode") and x[1].opcode > -1}
+for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
+    if hasattr(cls, "opcode") and cls.opcode > -1:
+        InstructionSet[cls.opcode] = cls
+        NameToOpcode[name] = cls.opcode
+        OpcodeToName[cls.opcode] = name
