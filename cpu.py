@@ -1,6 +1,7 @@
 from instructions import BaseInstruction, InstructionSet
 from typ import Flags, Registers, Data
 from display import Display
+from utils import BLANK_FLAGS
 
 
 MIN_RAM_SIZE = 4096       # 4KB ensures enough for 80x50 character display
@@ -10,12 +11,12 @@ MAX_RAM_SIZE = 64 * 1024  # 64KB max for 16-bit address space
 class CPU:
     def __init__(self, ram_size: int = MAX_RAM_SIZE, gpu: Display|None = None) -> None:
         self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size))  # Clamp RAM size between 4KB-64KB
-        self.RAM: Data = [0 for _ in range(self.RAM_SIZE)]
+        self.RAM: Data = [0] * self.RAM_SIZE
         self.GPU: Display|None = gpu
         # General Purpose Registers
         self.REG: Registers = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
         # Status Registers
-        self.FLAGS: Flags = {'Z': False, 'O': False, 'H': False, 'N': False}
+        self.FLAGS: Flags = BLANK_FLAGS
         # Tick Counter
         self.TICKS: int = 0
         # GPU Setup
@@ -58,13 +59,16 @@ class CPU:
         self.REG, self.FLAGS = instruction.run(self.REG, self.FLAGS, data, self.RAM)
 
     def reset(self) -> None:
-        self.REG: dict[str, int] = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
-        self.FLAGS: dict[str, bool] = {'Z': False, 'O': False, 'H': False, 'N': False}
-        self.RAM = [0 for _ in range(self.RAM_SIZE)]
+        self.REG: Registers = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
+        self.FLAGS: Flags = BLANK_FLAGS
+        self.RAM: Data = [0] * self.RAM_SIZE
 
     def load_data(self, data: Data, offset: int = 0) -> None:
-        for i, d in enumerate(data):
-            self.RAM[(i + offset) % self.RAM_SIZE] = d  # Mod by length of RAM to wrap round if required
+        end = offset + len(data)
+        if end <= self.RAM_SIZE:
+            self.RAM[offset:end] = data
+        else:
+            raise ValueError(f"Data exceeds RAM size: {end} > {self.RAM_SIZE}")
 
     def __str__(self) -> str:
         return f"Ticks: {self.TICKS:,} Registers: {self.REG} Flags: {self.FLAGS}"
