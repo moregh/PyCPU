@@ -1,4 +1,4 @@
-from utils import set_flags, data_to_memory_location, BLANK_FLAGS
+from utils import set_flags, data_to_memory_location, BLANK_FLAGS, HALT_FLAGS
 from abc import ABC, abstractmethod
 import inspect
 import sys
@@ -50,8 +50,7 @@ class HLT(BaseInstruction):
 
     @staticmethod
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
-        flags['H'] = True
-        return reg, flags
+        return reg, HALT_FLAGS
 
 
 class CLR(BaseInstruction):

@@ -1,6 +1,6 @@
 from typ import Flags, Registers, Data
 
-
+HALT_FLAGS:      Flags = {'Z': False, 'O': False, 'H': True,  'N': False}
 BLANK_FLAGS:     Flags = {'Z': False, 'O': False, 'H': False, 'N': False}
 ZERO_FLAGS:      Flags = {'Z': True,  'O': False, 'H': False, 'N': False}
 OVERFLOW_FLAGS:  Flags = {'Z': False, 'O': True,  'H': False, 'N': False}
