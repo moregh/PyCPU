@@ -33,6 +33,6 @@ def set_flags(value: int) -> dict[str, bool]:
         return ZERO_FLAGS
     elif value > 255:
         if value == 256:
-            return ZERO_FLAGS
+            return OVER_ZERO_FLAGS
         return OVERFLOW_FLAGS
     return BLANK_FLAGS
