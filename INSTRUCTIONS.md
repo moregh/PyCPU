@@ -113,16 +113,20 @@ return **reg** and **flags** dicts to the CPU.
         return reg, flags
 ```
 
-Helper functions are available for modifying flags. If you have changed a value of a register,
+Helper functions are available for modifying flags and mathematical functions. 
+
+If you have changed a value of a register,
 use the **set_flags(value: int)** method to create a flags register automatically. If you
-haven't changed any values, use the **BLANK_FLAGS** predefined dictionary.
+haven't changed any values, use the **BLANK_FLAGS** predefined dictionary. 
+
+If you're doing addition or subtraction, generate the flags and wrap automatically using the **safe_add(*expr*)** and **safe_sub(*expr*)** functions.
 
 ### Example
 
 Below is an example of an instruction that adds up the **X** and **Y** registers then stores
 the result in the **A** register. We shall name this instruction **ALL**.
 
-Note how we must manually handle any possible overflow of the values.
+Note how we use the helper function *safe_add()* to automatically handle wrapping and flags.
 
 ```python
 class ALL(BaseInstruction):
@@ -134,9 +138,6 @@ class ALL(BaseInstruction):
     
     @staticmethod
     def run(reg: dict[str: int], flags: dict[str: int], data: list[int], ram: list[int]) -> tuple[dict, dict]:
-        reg['A'] += reg['X'] + reg['Y']
-        flags = set_flags(reg['A'])
-        if flags['O']:  # Check to see if we overflowed
-            reg['A'] = reg['A'] % 256  # If we did, mod 256 to get a value in range
+        reg['A'], flags = safe_add(reg['X'] + reg['Y'])
         return reg, flags
 ```
