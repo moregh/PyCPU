@@ -22,8 +22,7 @@ def safe_add(value: int) -> tuple[int, Flags]:
 
 def safe_sub(value: int) -> tuple[int, Flags]:
     flags = set_flags(value)
-    if value < 0:
-        value += BYTE_SIZE
+    value = value % BYTE_SIZE
     return value, flags
 
 
