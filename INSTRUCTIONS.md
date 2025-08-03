@@ -78,6 +78,10 @@ This is a list of all the pre-defined instructions available on the CPU.
 | JBA | 58 | 0 | Jump Backward A - sets PC to its current value minus the value of the A register (wraps around memory) | None |
 | JBX | 59 | 0 | Jump Backward X - sets PC to its current value minus the value of the X register (wraps around memory) | None |
 | JBY | 60 | 0 | Jump Backward Y - sets PC to its current value minus the value of the Y register (wraps around memory) | None |
+| RMI | 61 | 0 | Read Memory Indexed - reads memory[X + Y*256] into A register | Z |
+| WMI | 62 | 0 | Write Memory Indexed - writes A register to memory[X + Y*256] | None |
+| RMO | 63 | 2 | Read Memory Offset - reads memory[base_addr + X] into A register, base_addr is provided as 2-byte parameter | Z |
+| WMO | 64 | 2 | Write Memory Offset - writes A register to memory[base_addr + X], base_addr is provided as 2-byte parameter | None |
 
 ## Add Instructions
 

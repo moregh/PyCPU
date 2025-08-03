@@ -852,7 +852,7 @@ class RMI(BaseInstruction):
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
         location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
         reg['A'] = ram[location]
-        return reg, BLANK_FLAGS
+        return reg, set_flags(reg['A'])
 
 
 class WMI(BaseInstruction):
@@ -871,8 +871,7 @@ class WMI(BaseInstruction):
 
 class RMO(BaseInstruction):
     """
-    Read Memory Offset - reads memory[base_addr + X] into A register
-    base_addr is provided as 2-byte parameter
+    Read Memory Offset - reads memory[base_addr + X] into A register, base_addr is provided as 2-byte parameter
     """
     opcode: int = iota()
     length: int = 2
@@ -882,13 +881,12 @@ class RMO(BaseInstruction):
         base_addr = data_to_memory_location(data)
         location = (base_addr + reg['X']) & (len(ram) - 1)
         reg['A'] = ram[location]
-        return reg, BLANK_FLAGS
+        return reg, set_flags(reg['A'])
 
 
 class WMO(BaseInstruction):
     """
-    Write Memory Offset - writes A register to memory[base_addr + X]
-    base_addr is provided as 2-byte parameter
+    Write Memory Offset - writes A register to memory[base_addr + X], base_addr is provided as 2-byte parameter
     """
     opcode: int = iota()
     length: int = 2
