@@ -859,3 +859,5 @@ for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
         InstructionSet[cls.opcode] = cls
         NameToOpcode[name] = cls.opcode
         OpcodeToName[cls.opcode] = name
+
+InstructionList: list[type] = [InstructionSet.get(i, InstructionSet[0]) for i in range(256)]

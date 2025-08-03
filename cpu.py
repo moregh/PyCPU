@@ -1,4 +1,4 @@
-from instructions import BaseInstruction, InstructionSet
+from instructions import BaseInstruction, InstructionList
 from typ import Flags, Registers, Data
 from display import Display
 from utils import BLANK_FLAGS, next_power_of_two
@@ -53,10 +53,7 @@ class CPU:
         return data
 
     def decode(self, opcode: int) -> tuple[BaseInstruction, Data]:
-        try:
-            instruction: BaseInstruction = InstructionSet[opcode] # type: ignore
-        except KeyError:
-            instruction: BaseInstruction = InstructionSet[0]  # type: ignore # Default to HLT instruction if invalid data is found
+        instruction: BaseInstruction = InstructionList[opcode] # type: ignore
         data: Data = [self.fetch() for _ in range(instruction.length)]
         return instruction, data
 
