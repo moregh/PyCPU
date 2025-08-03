@@ -1,4 +1,4 @@
-from instructions import NameToOpcode, OpcodeToName, InstructionSet
+from instructions import NameToOpcode, InstructionSet
 from typ import Data
 
 
@@ -74,13 +74,9 @@ def two_pass(code: str) -> Data:
                 parsed_instructions.append(low)
             else:
                 raise ValueError(f"Invalid argument: {arg}")
-    print(f"Parsed instructions: {parsed_instructions}")
-    print(f"Labels: {labels}")
     return parsed_instructions
 
 
 def compile(filename: str) -> Data:
     code = read_file(filename)
-    # cleaned = strip_comments_and_whitespace(code)
     return two_pass(code)
-    
