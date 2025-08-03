@@ -841,6 +841,66 @@ class JBY(BaseInstruction):
         return reg, BLANK_FLAGS
 
 
+class RMI(BaseInstruction):
+    """
+    Read Memory Indexed - reads memory[X + Y*256] into A register
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
+        reg['A'] = ram[location]
+        return reg, BLANK_FLAGS
+
+
+class WMI(BaseInstruction):
+    """
+    Write Memory Indexed - writes A register to memory[X + Y*256]
+    """
+    opcode: int = iota()
+    length: int = 0
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
+        ram[location] = reg['A']
+        return reg, BLANK_FLAGS
+
+
+class RMO(BaseInstruction):
+    """
+    Read Memory Offset - reads memory[base_addr + X] into A register
+    base_addr is provided as 2-byte parameter
+    """
+    opcode: int = iota()
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        base_addr = data_to_memory_location(data)
+        location = (base_addr + reg['X']) & (len(ram) - 1)
+        reg['A'] = ram[location]
+        return reg, BLANK_FLAGS
+
+
+class WMO(BaseInstruction):
+    """
+    Write Memory Offset - writes A register to memory[base_addr + X]
+    base_addr is provided as 2-byte parameter
+    """
+    opcode: int = iota()
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        base_addr = data_to_memory_location(data)
+        location = (base_addr + reg['X']) & (len(ram) - 1)
+        ram[location] = reg['A']
+        return reg, BLANK_FLAGS
+
+
 """
 ***********************************************************************************************************************
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * WARNING * * * * * * * * * * * * * * * * * * * * * * * * * * * *
