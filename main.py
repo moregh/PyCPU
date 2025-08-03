@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from cpu import CPU
-from compiler import parse_file
+from compiler import compile
 from display import Display
 
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # now open an example program which increments the registers sequentially
     cpu.reset()
     print(cpu)
-    cpu.load_data(parse_file("examples/counters.cpu"))
+    cpu.load_data(compile("examples/fibonacci.cpu"))
     while not cpu.halted:
         cpu.tick()
         if cpu.TICKS % 1000000 == 0:
