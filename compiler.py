@@ -7,14 +7,14 @@ def read_file(filename: str) -> str:
         return f.read()
 
 
-def strip_comments_and_whitespace(code: str) -> str:
+def strip_comments_and_whitespace(code: str) -> list[str]:
     lines = code.splitlines()
     stripped_lines = []
     for line in lines:
         line = line.split(";", 1)[0].strip()  # Remove comments and strip whitespace
         if line:  # Only add non-empty lines
             stripped_lines.append(line)
-    return "\n".join(stripped_lines)
+    return stripped_lines
 
 
 def addr_to_ints(addr: str) -> tuple[int, int]:
@@ -33,27 +33,33 @@ def int_to_addr(value: int) -> tuple[int, int]:
     return (value >> 8) & 0xFF, value & 0x00FF
 
 
-def parse_code(code: str) -> Data:
-    code = strip_comments_and_whitespace(code)
-    instructions = code.split("\n")
-    parsed_instructions: Data = []
+def two_pass(code: str) -> Data:
+    # First pass: parse the code and collect labels
+    instructions = [x for x in strip_comments_and_whitespace(code) if x]
+    parsed_instructions = []
     labels = {}
-
+    idx = 0
     for instruction in instructions:
         parts = instruction.split()
+        assert 0 < len(parts) < 4, f"Invalid instruction format: {parts}"
         if parts[0].startswith(":"):
             label = parts[0][1:]
             if label in labels:
                 raise ValueError(f"Duplicate label found: {label}")
-            labels[label] = len(parsed_instructions)
+            labels[label] = idx
             continue
         opcode = NameToOpcode.get(parts[0])
         if opcode is None:
             raise ValueError(f"Unknown opcode: {parts[0]}")
-        if len(parts) != InstructionSet[opcode].length + 1:
-            if parts[1] not in labels:
-                # If the second part is a label, we allow it to be missing
-                raise ValueError(f"Incorrect number of arguments for {OpcodeToName[opcode]}: {len(parts) - 1} provided, {InstructionSet[opcode].length} expected")    
+        idx += InstructionSet[opcode].length + 1
+    # second pass
+    for instruction in instructions:
+        parts = instruction.split()
+        if parts[0].startswith(":"):
+            continue
+        opcode = NameToOpcode.get(parts[0])
+        if opcode is None:
+            raise ValueError(f"Unknown opcode: {parts[0]}")
         parsed_instructions.append(opcode)
         for arg in parts[1:]:
             if arg.startswith("$"):
@@ -68,9 +74,13 @@ def parse_code(code: str) -> Data:
                 parsed_instructions.append(low)
             else:
                 raise ValueError(f"Invalid argument: {arg}")
+    print(f"Parsed instructions: {parsed_instructions}")
+    print(f"Labels: {labels}")
     return parsed_instructions
 
 
 def compile(filename: str) -> Data:
     code = read_file(filename)
-    return parse_code(code)
+    # cleaned = strip_comments_and_whitespace(code)
+    return two_pass(code)
+    

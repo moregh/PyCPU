@@ -4,10 +4,14 @@
 ; register and continue, starting with A, then X, then Y.
 ;
 :START
-INA         ; Increment A
-JNO START   ; If A did not overflow, go back to the start
-INX         ; A did overflow, increment X
-JNO START   ; If X did not overflow, go back to the start
-INY         ; X did overflow, increment Y
-JNO START   ; If Y did not overflow, go back to the start
-HLT         ; Y did overflow, halt the program
+:A_INCREMENTER
+INA              ; Increment A
+JNO START        ; If A did not overflow, go back to the start
+:X_INCREMENTER
+INX              ; A did overflow, increment X
+JNO START        ; If X did not overflow, go back to the start
+:Y_INCREMENTER
+INY              ; X did overflow, increment Y
+JNO START        ; If Y did not overflow, go back to the start
+:EXIT
+HLT              ; Y did overflow, halt the program
