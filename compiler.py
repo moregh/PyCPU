@@ -33,7 +33,7 @@ def int_to_addr(value: int) -> tuple[int, int]:
     return (value >> 8) & 0xFF, value & 0x00FF
 
 
-def two_pass(code: str) -> Data:
+def two_pass(code: str, verbose=False) -> Data:
     # First pass: parse the code and collect labels
     instructions = [x for x in strip_comments_and_whitespace(code) if x]
     parsed_instructions = []
@@ -74,9 +74,12 @@ def two_pass(code: str) -> Data:
                 parsed_instructions.append(low)
             else:
                 raise ValueError(f"Invalid argument: {arg}")
+    if verbose:
+        print(f"Parsed {len(parsed_instructions)} bytes of instructions from {len(instructions)} lines.")
+        print(f"Labels found: {labels}")
     return parsed_instructions
 
 
-def compile(filename: str) -> Data:
+def compile(filename: str, verbose=False) -> Data:
     code = read_file(filename)
-    return two_pass(code)
+    return two_pass(code, verbose)
