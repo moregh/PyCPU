@@ -1,7 +1,7 @@
 from instructions import BaseInstruction, InstructionSet
 from typ import Flags, Registers, Data
 from display import Display
-from utils import BLANK_FLAGS
+from utils import BLANK_FLAGS, next_power_of_two
 
 
 MIN_RAM_SIZE = 4       # 4KB ensures enough for 80x50 character display
@@ -15,7 +15,7 @@ class CPU:
         :param ram_size: RAM size in KB, range: 4 - 64, default: 64
         :param gpu: Optional Display object for GPU functionality.
         """
-        self.RAM_SIZE: int = min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size)) * 1024 # Clamp RAM size between 4KB-64KB
+        self.RAM_SIZE: int = next_power_of_two(min(MAX_RAM_SIZE, max(MIN_RAM_SIZE, ram_size))) * 1024 # Clamp RAM to power of 2 between 4KB-64KB
         self.RAM: Data = [0] * self.RAM_SIZE
         self.GPU: Display|None = gpu
         # General Purpose Registers

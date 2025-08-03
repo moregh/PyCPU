@@ -39,3 +39,16 @@ def set_flags(value: int) -> Flags:
             return OVER_ZERO_FLAGS
         return OVERFLOW_FLAGS
     return BLANK_FLAGS
+
+
+def next_power_of_two(n):
+    if n <= 0:
+        raise ValueError("Input must be a positive integer")
+    # Check if n is already a power of 2
+    if (n & (n - 1)) == 0:
+        return n
+    # Otherwise, find the next power of 2
+    power = 1
+    while power < n:
+        power <<= 1
+    return power
