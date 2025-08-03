@@ -1,0 +1,42 @@
+; Writes HELLO to the display
+:START
+    LDY 240       ; $F0 - high byte of GPU memory
+    LDX 96        ; $60 - low byte of GPU memory  
+    LDA 72        ; 'H' - test character
+    WMI           ; Write to $F060
+    
+    ; Write "HELLO WORLD" to first row
+    LDA 72        ; 'H'
+    WMI
+    INX
+    LDA 69        ; 'E'  
+    WMI
+    INX
+    LDA 76        ; 'L'
+    WMI
+    INX
+    LDA 76        ; 'L'
+    WMI
+    INX
+    LDA 79        ; 'O'
+    WMI
+    INX
+    LDA 32        ; ' '
+    WMI
+    INX
+    LDA 87        ; 'W'
+    WMI
+    INX
+    LDA 79        ; 'O'
+    WMI
+    INX
+    LDA 82        ; 'R'
+    WMI
+    INX
+    LDA 76        ; 'L'
+    WMI
+    INX
+    LDA 68        ; 'D'
+    WMI
+    INX
+    HLT
