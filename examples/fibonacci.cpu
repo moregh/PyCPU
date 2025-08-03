@@ -1,6 +1,6 @@
 ; OLD FORMAT
 ;
-; LDY 5               ; Loads the Y register with value 14
+; LDY 12              ; Loads the Y register with value 12
 ; LDA 0               ; Loads the A register with value 0
 ; LDX 1               ; Loads the X register with value 1
 ; WMA 0 100           ; Write value of register A to memory location 100
@@ -19,7 +19,7 @@
 ; NEW FORMAT
 ;
 :_START             ; Entry point
-    LDY 5           ; Load 5 so we calculate the 6th fibonacci number (0-5)
+    LDY 12          ; Load 12 so we calculate the 6th fibonacci number (0-5)
     LDA 0           ; Load A with 0 (first fibonacci number)   
     LDX 1           ; Load X with 1 (second fibonacci number)
 :LOOP               ; Main loop
