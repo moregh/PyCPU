@@ -1,0 +1,39 @@
+; Memory Layout
+;
+; $0910 - Temp X value (only temporary storage needed)
+; --
+; $F060 - Start of GPU buffer
+; $FFFF - End of GPU buffer
+
+:_INIT
+    ; Start with space character and initial GPU address
+    LDA 32              ; Start with space
+    LDX 96              ; Start at low address $60 (GPU buffer start)
+    LDY 240             ; Start at high address $F0 (GPU buffer start)
+
+:WRITE_LOOP
+    WMI                 ; Write current character to memory[Y*256 + X]
+    
+    ; Toggle character for next write
+    WMX $0910           ; Save X temporarily
+    LDX 32              ; Load space value for comparison
+    SAX                 ; A - 32 (if A was space, result is 0)
+    JMZ SET_ASTERISK    ; If A was space, set to asterisk
+    LDA 32              ; A was asterisk, set to space
+    JMP RESTORE_X
+:SET_ASTERISK
+    LDA 42              ; Set to asterisk
+:RESTORE_X
+    RMX $0910           ; Restore X
+    
+    ; Increment position
+    INX                 ; Increment low byte
+    JNO WRITE_LOOP      ; If no overflow, continue
+    
+    ; X overflowed, increment Y (high byte)
+    LDX 0               ; Reset X to 0
+    INY                 ; Increment Y
+    JNO WRITE_LOOP      ; If Y didn't overflow, continue
+    
+    ; Both X and Y overflowed - we've filled all memory
+    HLT
