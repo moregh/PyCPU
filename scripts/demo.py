@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-from cpu import CPU
-from compiler import compile
-from display import Display
+import sys
+sys.path.append('../src')
+from python_cpu_emulator.cpu import CPU
+from python_cpu_emulator.compiler import compile
 
 
 if __name__ == "__main__":
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     # now open an example program which increments the registers sequentially
     cpu.reset()
     print(cpu)
-    cpu.load_data(compile("examples/counters.cpu"))
+    cpu.load_data(compile("../examples/intermediate/counters.cpu"))
     while not cpu.halted:
         cpu.tick()
         if cpu.TICKS % 1000000 == 0:

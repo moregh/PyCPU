@@ -1,8 +1,8 @@
-from utils import set_flags, data_to_memory_location, BLANK_FLAGS, HALT_FLAGS
 from abc import ABC, abstractmethod
 import inspect
 import sys
-from typ import Flags, Registers, Data
+from .utils import set_flags, data_to_memory_location, BLANK_FLAGS, HALT_FLAGS
+from .types import Flags, Registers, Data
 
 
 BYTE_SIZE = 256

@@ -1,5 +1,5 @@
-from instructions import NameToOpcode, InstructionSet
-from typ import Data
+from .instructions import NameToOpcode, InstructionSet
+from .types import Data
 
 
 def read_file(filename: str) -> str:

@@ -1,7 +1,7 @@
-from instructions import BaseInstruction, InstructionList
-from typ import Flags, Registers, Data
-from display import Display
-from utils import BLANK_FLAGS, next_power_of_two
+from .instructions import BaseInstruction, InstructionList
+from .types import Flags, Registers, Data
+from .display import Display
+from .utils import BLANK_FLAGS, next_power_of_two
 
 
 MIN_RAM_SIZE = 4       # 4KB ensures enough for 80x50 character display

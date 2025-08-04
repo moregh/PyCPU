@@ -1,4 +1,5 @@
-from typ import Flags, Registers, Data
+from .types import Flags, Registers, Data
+
 
 HALT_FLAGS:      Flags = {'Z': False, 'O': False, 'H': True,  'N': False}
 BLANK_FLAGS:     Flags = {'Z': False, 'O': False, 'H': False, 'N': False}
