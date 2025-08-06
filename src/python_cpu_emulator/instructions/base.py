@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ..utils import set_flags, data_to_memory_location, BLANK_FLAGS, HALT_FLAGS
+from ..utils import set_flags, data_to_memory_location, BLANK_FLAGS, HALT_FLAGS, ZERO_FLAGS
 from ..types import Flags, Registers, Data
 
 

@@ -1,4 +1,4 @@
-from .base import BaseInstruction, BLANK_FLAGS, set_flags, data_to_memory_location
+from .base import BaseInstruction, BLANK_FLAGS, ZERO_FLAGS, set_flags, data_to_memory_location
 from ..types import Flags, Registers, Data
 
 
@@ -131,4 +131,66 @@ class WMO(BaseInstruction):
         base_addr = data_to_memory_location(data)
         location = (base_addr + reg['X']) & (len(ram) - 1)
         ram[location] = reg['A']
+        return reg, BLANK_FLAGS
+    
+
+class FIL(BaseInstruction):
+    """
+    Fill - Fill A bytes starting at (X,Y) with value from parameter
+    """
+    length: int = 1
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        start_location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
+        fill_value = data[0]
+        count = reg['A']
+        
+        for i in range(count):
+            location = (start_location + i) & (len(ram) - 1)
+            ram[location] = fill_value
+            
+        return reg, BLANK_FLAGS
+    
+
+class CMP(BaseInstruction):
+    """
+    Compare Memory - Compare A bytes at (X,Y) with bytes at specified address, set Z flag if equal
+    """
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        source_location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
+        compare_location = data_to_memory_location(data) & (len(ram) - 1)
+        count = reg['A']
+        
+        for i in range(count):
+            source_addr = (source_location + i) & (len(ram) - 1)
+            compare_addr = (compare_location + i) & (len(ram) - 1)
+            
+            if ram[source_addr] != ram[compare_addr]:
+                return reg, BLANK_FLAGS  # Not equal, Z flag remains false
+        
+        # All bytes matched
+        return reg, ZERO_FLAGS  # Set Z flag to indicate equality
+
+
+class CPY(BaseInstruction):
+    """
+    Copy Memory - Copy A bytes from source (X,Y) to destination address
+    """
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        source_location = (reg['Y'] * 256 + reg['X']) & (len(ram) - 1)
+        dest_location = data_to_memory_location(data) & (len(ram) - 1)
+        count = reg['A']
+        
+        for i in range(count):
+            source_addr = (source_location + i) & (len(ram) - 1)
+            dest_addr = (dest_location + i) & (len(ram) - 1)
+            ram[dest_addr] = ram[source_addr]
+        
         return reg, BLANK_FLAGS
