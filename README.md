@@ -89,4 +89,4 @@ Overflowing or negative numbers will be wrapped around.
 
 ## Instructions
 
-Please see <a href="INSTRUCTIONS.md">INSTRUCTIONS.md</a> for further details.
+Please see <a href="docs/Instructions.md">INSTRUCTIONS.md</a> for further details.
