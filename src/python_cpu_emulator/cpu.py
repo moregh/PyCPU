@@ -49,7 +49,7 @@ class CPU:
 
     def fetch(self) -> int:
         data = self.RAM[self.REG['PC']]
-        self.REG['PC'] = (self.REG['PC'] + 1) % self.RAM_SIZE  # Modulo length of RAM to wrap when required
+        self.REG['PC'] = (self.REG['PC'] + 1) & (self.RAM_SIZE - 1)
         return data
 
     def decode(self, opcode: int) -> tuple[BaseInstruction, Data]:
