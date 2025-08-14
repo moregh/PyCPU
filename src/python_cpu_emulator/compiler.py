@@ -3,8 +3,17 @@ from .types import Data
 
 
 def read_file(filename: str) -> str:
-    with open(filename, "r") as f:
-        return f.read()
+    try:
+        with open(filename, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filename}")
+    except IOError as e:
+        raise IOError(f"Error reading file {filename}: {e}")
+    except UnicodeDecodeError:
+        raise ValueError(f"File {filename} is not a valid text file or contains invalid characters.")
+    except Exception as e:
+        raise Exception(f"An unexpected error occurred while reading {filename}: {e}")
 
 
 def strip_comments_and_whitespace(code: str) -> list[str]:
