@@ -12,7 +12,7 @@ OVER_ZERO_FLAGS: Flags = {'Z': True,  'O': True,  'H': False, 'N': False}
 def build_readme() -> str:
     """Prints out a sorted list of opcodes ready to be imported into the INSTRUCTIONS.md file"""
     import operator
-    from instructions import InstructionSet
+    from .instructions import InstructionSet
     output = "| Name | Opcode | Length | Description | Flags |"
     for instr in (sorted(InstructionSet.values(), key=operator.attrgetter('opcode'))):
         output += f"\n| {str(instr)[21:-2]} | {instr.opcode} | {instr.length} | {instr.__doc__.strip()} | None |" # type: ignore
