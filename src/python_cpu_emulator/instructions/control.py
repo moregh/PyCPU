@@ -212,3 +212,34 @@ class JAD(BaseInstruction):
         high_byte = ram[(location + 1) & (len(ram) - 1)]
         reg['PC'] = (high_byte << 8) | low_byte
         return reg, BLANK_FLAGS
+    
+
+class WPC(BaseInstruction):
+    """
+    Write Program Counter - writes the current value of the program counter to the specified memory location (2 bytes)
+    """
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        location = data_to_memory_location(data) & (len(ram) - 1)
+        low_byte = reg['PC'] & 0xFF
+        high_byte = (reg['PC'] >> 8) & 0xFF
+        ram[location] = low_byte
+        ram[(location + 1) & (len(ram) - 1)] = high_byte
+        return reg, BLANK_FLAGS
+    
+
+class RPC(BaseInstruction):
+    """
+    Read Program Counter - reads a 2-byte value from the specified memory location and sets the program counter to that value
+    """
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        location = data_to_memory_location(data) & (len(ram) - 1)
+        low_byte = ram[location]
+        high_byte = ram[(location + 1) & (len(ram) - 1)]
+        reg['PC'] = (high_byte << 8) | low_byte
+        return reg, BLANK_FLAGS
