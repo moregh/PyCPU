@@ -6,28 +6,11 @@ from python_cpu_emulator.compiler import compile
 
 
 if __name__ == "__main__":
-    cpu = CPU()       # Makes a new CPU, with the default RAM value of 64KiB
-
-    cpu.RAM[0] = 3    # LDA has opcode 3, loads 1 byte into the A register
-    cpu.RAM[1] = 100  # The value 100 will be loaded in to the A register
-    cpu.tick()        # Run the previous instruction (tick 1)
-
-    cpu.RAM[2] = 4    # LDX has opcode 4, loads 1 byte into the X register
-    cpu.RAM[3] = 150  # The value 150 will be loaded into the X register
-    cpu.tick()        # Run the previous instruction (tick 2)
-
-    cpu.RAM[4] = 12   # AAX has opcode 12, adds the values of A and X and stores them into A
-    cpu.tick()        # Run the previous instruction (tick 3)
-
-    print(cpu)        # Print out the status of the CPU, showing 3 ticks and 250 in the A register
-
-    # now open an example program which increments the registers sequentially
-    cpu.reset()
-    print(cpu)
-    cpu.load_data(compile("../examples/basic/counters.cpu"))
+    cpu = CPU()       # Makes a new CPU, with the default RAM value of 64KiB and no CPU
+    cpu.load_data(compile("../examples/basic/counters.cpu"))  # Load an example program
     while not cpu.halted:
         cpu.tick()
         if cpu.TICKS % 1000000 == 0:
             print(cpu)
     print(cpu) 
-    # this should finish after 33,686,020 ticks.
+    # this should finish after 33,686,017 ticks.
