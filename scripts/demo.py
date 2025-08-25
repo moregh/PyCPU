@@ -6,7 +6,7 @@ from python_cpu_emulator.compiler import compile
 
 
 if __name__ == "__main__":
-    cpu = CPU()       # Makes a new CPU, with the default RAM value of 64KiB and no CPU
+    cpu = CPU()       # Makes a new CPU, with the default RAM value of 64KiB and no GPU
     cpu.load_data(compile("../examples/basic/counters.cpu"))  # Load an example program
     while not cpu.halted:
         cpu.tick()
