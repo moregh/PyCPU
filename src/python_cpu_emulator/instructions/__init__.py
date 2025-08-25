@@ -16,7 +16,7 @@ def _collect_instructions():
     package_name = __name__
     
     # Discover all modules in the instructions package
-    for importer, modname, ispkg in pkgutil.iter_modules([package_path]):
+    for _, modname, _ in pkgutil.iter_modules([package_path]):
         # Skip the base module as it doesn't contain instruction classes
         if modname == 'base':
             continue
