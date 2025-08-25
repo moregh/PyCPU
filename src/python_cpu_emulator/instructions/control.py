@@ -196,3 +196,19 @@ class JBY(BaseInstruction):
     def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
         reg['PC'] = (reg['PC'] - reg['Y']) & (len(ram) - 1)
         return reg, BLANK_FLAGS
+    
+
+class JAD(BaseInstruction):
+    """
+    Jump to Memory Address - Sets program counter to address at specified memory location (2 bytes)
+    """
+
+    length: int = 2
+
+    @staticmethod
+    def run(reg: Registers, flags: Flags, data: Data, ram: Data) -> tuple[Registers, Flags]:
+        location = data_to_memory_location(data) & (len(ram) - 1)
+        low_byte = ram[location]
+        high_byte = ram[(location + 1) & (len(ram) - 1)]
+        reg['PC'] = (high_byte << 8) | low_byte
+        return reg, BLANK_FLAGS
