@@ -9,7 +9,6 @@ from python_cpu_emulator.display import Display
 if __name__ == "__main__":
     cpu = CPU(gpu=Display())       # Makes a new CPU, with the default RAM value of 64KiB
     cpu.load_data(compile("../examples/intermediate/pattern.cpu"))
-    while not cpu.halted:
-        cpu.tick()
-    print(cpu) 
+    cpu.run()
     # This will finish after 38,052 ticks
+    

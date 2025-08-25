@@ -72,5 +72,17 @@ class CPU:
         else:
             raise ValueError(f"Data exceeds RAM size: {end} > {self.RAM_SIZE}")
 
+    def run(self, report_interval: int = 1_000_000) -> None:
+        try:
+            while not self.halted:
+                self.tick()
+                if self.TICKS % report_interval == 0:
+                    print(self)
+        except KeyboardInterrupt:
+            print("Execution interrupted by user.")
+        finally:
+            print("Final CPU State:")
+            print(self)
+
     def __str__(self) -> str:
         return f"Ticks: {self.TICKS:,} Registers: {self.REG} Flags: {self.FLAGS}"
