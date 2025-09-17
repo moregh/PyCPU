@@ -1,92 +1,154 @@
-# Python Software CPU
-A simple software CPU written in Python 3, designed to be easy to
-understand and modify.
+# Python CPU Emulator
 
-### About
+A software-based CPU emulator written in Python 3, designed for educational purposes and easy modification. The emulator provides a complete 8-bit processor with comprehensive instruction set and testing framework.
 
-The CPU is 8-bits and uses 16-bit addressing. The following features are available:
+## About
 
-- 3 general purpose registers
-- Up to 64KiB RAM
-- Customisable instruction set
-- Status flags
+This CPU emulator implements an 8-bit processor with 16-bit addressing capabilities. Key features include:
 
-The software is designed to be easily understood and modifiable.
+- 3 general purpose registers (A, X, Y)
+- 16-bit program counter (PC)
+- Up to 64KB addressable RAM
+- Turing-complete instruction set with 80+ instructions
+- Status flags (Zero, Overflow, Negative, Halt)
+- Optional display output
+- Built-in assembler and compiler
+- Comprehensive testing framework
+
+The software is designed to be educational, demonstrating CPU architecture concepts while remaining easily modifiable and extensible.
 
 ## Quick Start
 
-Simply import the CPU, write some code and get to work!
-
 ```python
-from cpu import CPU
+from python_cpu_emulator import CPU, compile
 
+# Create a CPU instance
+cpu = CPU()
 
-cpu = CPU()       # Makes a new CPU, with the default RAM value of 64KiB
+# Compile and load assembly code
+program = compile("examples/basic/hello.cpu")
+cpu.load_data(program)
 
-cpu.RAM[0] = 3    # LDA has opcode 3, loads 1 byte into the A register
-cpu.RAM[1] = 100  # The value 100 will be loaded in to the A register
-cpu.tick()        # Run the previous instruction (tick 1)
-
-cpu.RAM[2] = 4    # LDX has opcode 4, loads 1 byte into the X register
-cpu.RAM[3] = 150  # The value 150 will be loaded into the X register
-cpu.tick()        # Run the previous instruction (tick 2)
-
-cpu.RAM[4] = 12   # AAX has opcode 12, adds the values of A and X and stores them into A
-cpu.tick()        # Run the previous instruction (tick 3)
-
-print(cpu)        # Print out the status of the CPU, showing 3 ticks and 250 in the A register
-```
-**Output:**
-```commandline
-Ticks: 3 Registers: {'A': 250, 'X': 150, 'Y': 0, 'PC': 5} Flags: {'Z': False, 'O': False, 'H': False, 'N': False}
+# Execute until halt
+cpu.run()
 ```
 
-### Example
+## Example Programs
 
-This will demonstrate how to use the *examples/fibonacci.cpu* program with the CPU.
-
+### Counter Program
 ```python
-from cpu import CPU
-from compiler import parse_file
+from python_cpu_emulator import CPU, compile
 
-
-# Create a new CPU instance with 256 bytes of RAM
-cpu = CPU(ram_size=256) 
-
-# Load the fibonacci.py file into the CPU
-cpu.load_data(parse_file("examples/fibonacci.cpu"))
-
-# Run the code until the CPU halts
-while not cpu.halted:
-    cpu.tick()
-    
-# Print the current CPU status.
-print(cpu)
+# Load the counter example
+cpu = CPU()
+cpu.load_data(compile("examples/basic/counters.cpu"))
+cpu.run()  # Runs for 33,686,017 ticks until overflow
 ```
 
-**Output:**
-```commandline
-Ticks: 94 Registers: {'A': 121, 'X': 1, 'Y': 1, 'PC': 24} Flags: {'Z': False, 'O': False, 'H': True, 'N': False}
+### Display Output
+```python
+from python_cpu_emulator import CPU, compile, Display
+
+# Create CPU with display
+cpu = CPU(gpu=Display())
+cpu.load_data(compile("examples/intermediate/pattern.cpu"))
+cpu.run(report_interval=1000)
 ```
 
 ## CPU Architecture
 
 ### Registers
-
-The CPU has three 8-bit general purpose registers, *A*, *X* and *Y*, and a 16-bit program 
-counter *PC*. These are stored within a dictionary in the CPU called *REG*.
+- **A, X, Y**: 8-bit general purpose registers
+- **PC**: 16-bit program counter
 
 ### Status Flags
+- **Z** (Zero): Set when operation result equals zero
+- **O** (Overflow): Set when operation result exceeds 8-bit range (>255)
+- **N** (Negative): Set when operation result is negative (wrapped to 128-255)
+- **H** (Halt): Set by HLT instruction to stop execution
 
-The CPU has status flags referring to the state of the CPU following the previous instruction.
-These are:
-- **O**verflow - set True when the result of the operation was larger than 8-bits (255)
-- **Z**ero - set True when the result of the operation was zero
-- **N**egative - set True when the result of the operation was a negative number
-- **H**alt - set True by the HLT instruction
+### Memory
+- 16-bit address space (64KB maximum)
+- Configurable RAM size (4KB to 64KB)
+- Memory-mapped GPU support for character display
 
-Overflowing or negative numbers will be wrapped around.
+## Instruction Set
 
-## Instructions
+The CPU supports over 80 instructions across multiple categories:
 
-Please see <a href="docs/Instructions.md">INSTRUCTIONS.md</a> for further details.
+- **Arithmetic**
+- **Bitwise**
+- **Comparison**
+- **Load/Store**
+- **Memory**
+- **Control**
+
+See the complete instruction reference in the source documentation.
+
+## Assembly Language
+
+The emulator includes an assembler that supports:
+
+- Label-based addressing
+- Hexadecimal memory addresses ($FFFF)
+- Immediate values and memory operations
+- Comments (semicolon prefix)
+
+Example assembly:
+```assembly
+:START
+    LDA 42        ; Load 42 into A register
+    LDX 10        ; Load 10 into X register
+    AAX           ; Add A and X, store in A
+    WMA $0100     ; Write A to memory address $0100
+    HLT           ; Halt execution
+```
+
+## Testing Framework
+
+The project includes a comprehensive testing system that validates all instructions through actual CPU execution:
+
+```python
+from testing import test_instruction
+from python_cpu_emulator.instructions.arithmetic import INA
+
+# Test increment instruction
+test_instruction(INA, 
+                initial={'A': 5}, 
+                expected={'A': 6})
+```
+
+## Project Structure
+
+```
+src/python_cpu_emulator/
+├── __init__.py
+├── cpu.py              # Main CPU implementation
+├── compiler.py         # Assembly compiler
+├── display.py          # GPU display support
+├── tests.py            # Testing script
+├── types.py            # Type definitions
+├── utils.py            # Utility functions
+└── instructions/       # Instruction implementations
+    ├── arithmetic.py
+    ├── bitwise.py
+    ├── comparison.py
+    ├── control.py
+    ├── load_store.py
+    └── memory.py
+
+examples/
+├── basic/              # Simple example programs
+└── intermediate/       # More complex examples
+
+scripts/                # Demo scripts
+```
+
+## Requirements
+
+- Python 3.8 or higher
+- No external dependencies for core functionality
+
+## License
+
+This project is licensed using the [AGPL](LICENSE).
