@@ -33,32 +33,43 @@ class CPU:
         return self.FLAGS['H']
 
     def tick(self) -> None:
-        if self.halted:
+        if self.FLAGS['H']:  # Direct flag check, avoid property lookup
             return
-        # Fetch
-        opcode = self.fetch()
-        # Decode
-        instruction, data = self.decode(opcode)
-        # Execute
-        self.execute(instruction, data)
+        
+        # Fetch - inline for performance
+        pc = self.REG['PC']
+        opcode = self.RAM[pc]
+        
+        # Decode - inline instruction lookup and data fetching
+        instruction = InstructionList[opcode]
+        instruction_length = instruction.length
+        
+        # Batch update PC once instead of multiple increments
+        new_pc = (pc + 1 + instruction_length) & (self.RAM_SIZE - 1)
+        self.REG['PC'] = new_pc
+        
+        # Fetch instruction data efficiently
+        if instruction_length == 0:
+            data = []
+        elif instruction_length == 1:
+            data = [self.RAM[(pc + 1) & (self.RAM_SIZE - 1)]]
+        elif instruction_length == 2:
+            data = [self.RAM[(pc + 1) & (self.RAM_SIZE - 1)], 
+                    self.RAM[(pc + 2) & (self.RAM_SIZE - 1)]]
+        else:
+            # Fallback for longer instructions (rare)
+            data = [self.RAM[(pc + 1 + i) & (self.RAM_SIZE - 1)] 
+                    for i in range(instruction_length)]
+        
+        # Execute - keep existing interface
+        self.REG, self.FLAGS = instruction.run(self.REG, self.FLAGS, data, self.RAM)
+        
         # Increment counter
         self.TICKS += 1
-        # Handle GPU if required
-        if self.GPU:
+        
+        # Handle GPU efficiently
+        if self.GPU and self.GPU.should_draw():
             self.GPU.draw(self.RAM[self.GPU_OFFSET:])
-
-    def fetch(self) -> int:
-        data = self.RAM[self.REG['PC']]
-        self.REG['PC'] = (self.REG['PC'] + 1) & (self.RAM_SIZE - 1)
-        return data
-
-    def decode(self, opcode: int) -> tuple[BaseInstruction, Data]:
-        instruction: BaseInstruction = InstructionList[opcode] # type: ignore
-        data: Data = [self.fetch() for _ in range(instruction.length)]
-        return instruction, data
-
-    def execute(self, instruction: BaseInstruction, data: Data) -> None:
-        self.REG, self.FLAGS = instruction.run(self.REG, self.FLAGS, data, self.RAM)
 
     def reset(self) -> None:
         self.REG: Registers = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
