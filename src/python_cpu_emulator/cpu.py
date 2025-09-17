@@ -33,18 +33,18 @@ class CPU:
         return self.FLAGS['H']
 
     def tick(self) -> None:
-        if self.FLAGS['H']:  # Direct flag check, avoid property lookup
+        if self.FLAGS['H']:
             return
         
-        # Fetch - inline for performance
+        # Fetch
         pc = self.REG['PC']
         opcode = self.RAM[pc]
         
-        # Decode - inline instruction lookup and data fetching
+        # Decode
         instruction = InstructionList[opcode]
         instruction_length = instruction.length
         
-        # Batch update PC once instead of multiple increments
+    
         new_pc = (pc + 1 + instruction_length) & (self.RAM_SIZE - 1)
         self.REG['PC'] = new_pc
         
@@ -61,15 +61,15 @@ class CPU:
             data = [self.RAM[(pc + 1 + i) & (self.RAM_SIZE - 1)] 
                     for i in range(instruction_length)]
         
-        # Execute - keep existing interface
+        # Execute
         self.REG, self.FLAGS = instruction.run(self.REG, self.FLAGS, data, self.RAM)
+        
+        # Draw GPU if required
+        if self.GPU and self.GPU.should_draw():
+            self.GPU.draw(self.RAM[self.GPU_OFFSET:])
         
         # Increment counter
         self.TICKS += 1
-        
-        # Handle GPU efficiently
-        if self.GPU and self.GPU.should_draw():
-            self.GPU.draw(self.RAM[self.GPU_OFFSET:])
 
     def reset(self) -> None:
         self.REG: Registers = {'A': 0, 'X': 0, 'Y': 0, 'PC': 0}
