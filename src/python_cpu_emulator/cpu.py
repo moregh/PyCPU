@@ -1,4 +1,4 @@
-from .instructions import BaseInstruction, InstructionList
+from .instructions import InstructionList
 from .types import Flags, Registers, Data
 from .display import Display
 from .utils import BLANK_FLAGS, next_power_of_two
