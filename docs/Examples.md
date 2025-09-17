@@ -1,87 +1,290 @@
-# Examples
-Example software for the CPU
+# CPU Programming Examples
 
-## About
-This document contains annotated code snippets demonstrating how to perform certain tasks on
-the CPU. The individual files are available as [NAME].cpu within this folder.
+This document contains annotated code examples demonstrating programming techniques for the 8-bit CPU emulator. All example files are available as `.cpu` assembly files in the examples directory.
 
-**NOTE**: Comments are prefixed using a semicolon and run to the end of the line.
+## Assembly Language Conventions
 
-## Fibonacci Sequence
+- **Comments**: Use semicolon (`;`) prefix, extend to end of line
+- **Labels**: Use colon prefix (`:LABEL`) for jump targets
+- **Addresses**: Use dollar prefix (`$1000`) for hexadecimal memory addresses
+- **Values**: Use decimal numbers directly (`42`, `255`)
 
-Calculates the 15th Fibonacci number and saves the result in registers A (lower byte) and
-Y (upper byte).
+## Basic Examples
 
-```commandline
-fibonacci.cpu
+### Hello World Display
 
-LDY 14              ; Loads the Y register with value 14
-LDA 0               ; Loads the A register with value 0
-LDX 1               ; Loads the X register with value 1
-WMA 0 100           ; Write value of register A to memory location 100
-AAX                 ; Adds A and X registers and stores in A register
-JMO 0 24            ; If A register overflowed, jump to memory location 24
-RMX 0 100           ; Load register X with value at memory location 100
-DEY                 ; Decrement register Y by 1
-JNZ 0 6             ; If Y is NOT zero (i.e. we're not finished), loop back to the start
-RMY 0 200           ; Load register Y with value at memory location 200
-HLT                 ; Halts the CPU
-RMX 0 200           ; Load register X with value at memory location 200
-INX                 ; Increment register X by 1
-WMX 0 200           ; Write value of register X to memory location 200
-JMP 0 12            ; Jump to memory location 12
+Demonstrates writing text to the GPU framebuffer for display output.
+
+```assembly
+; hello.cpu - Display "HELLO WORLD" on screen
+
+:START
+    LDY 240       ; $F0 - high byte of GPU memory
+    LDX 96        ; $60 - low byte of GPU memory  
+    
+    ; Write "HELLO WORLD" character by character
+    LDA 72        ; 'H'
+    WMI           ; Write to framebuffer
+    INX           ; Move to next position
+    
+    LDA 69        ; 'E'
+    WMI
+    INX
+    
+    LDA 76        ; 'L'
+    WMI
+    INX
+    
+    LDA 76        ; 'L'
+    WMI
+    INX
+    
+    LDA 79        ; 'O'
+    WMI
+    INX
+    
+    LDA 32        ; ' ' (space)
+    WMI
+    INX
+    
+    LDA 87        ; 'W'
+    WMI
+    INX
+    
+    LDA 79        ; 'O'
+    WMI
+    INX
+    
+    LDA 82        ; 'R'
+    WMI
+    INX
+    
+    LDA 76        ; 'L'
+    WMI
+    INX
+    
+    LDA 68        ; 'D'
+    WMI
+    
+    HLT           ; Stop execution
 ```
-The above code is made up of 4 distinct sections:
-- initialisation
-- main loop 
-- overflow handling
-- completion and output
 
-#### Initialisation
-```commandline
-LDY 14              ; Loads the Y register with value 14
-LDA 0               ; Loads the A register with value 0
-LDX 1               ; Loads the X register with value 1
-```
-This sets the initial status of the registers ready to perform a loop. We want the 15th
-Fibonacci number, but load Y with *15 - 1 = 14* because we start with the 0th Fibonacci 
-number (0) pre-loaded. The A register will contain the currently calculated number, the X
-register will be used for holding previous numbers, and Y register is the loop counter.
+**Key Concepts:**
+- GPU framebuffer starts at `$F060`
+- Use indexed memory write (`WMI`) with Y=high byte, X=low byte
+- ASCII character codes for text display
 
-#### Main Loop
-```commandline
-WMA 0 100           ; Write value of register A to memory location 100
-AAX                 ; Adds A and X registers and stores in A register
-JMO 0 24            ; If A register overflowed, jump to memory location 24
-RMX 0 100           ; Load register X with value at memory location 100
-DEY                 ; Decrement register Y by 1
-JNZ 0 6             ; If Y is NOT zero (i.e. we're not finished), loop back to the start
-```
-This is where the actual calculation takes place. We store the value of the A register in to
-memory location 100 so we can use it later. Then we add the values of the A and X registers
-together and store the result in A. If the result of this calculation overflowed, we jump to
-memory location 24 where the overflow handling routine lives. If we didn't overflow, or we
-have returned from the overflow handling routine, we read the value we stored in memory
-location 100 earlier into the X register (the previous value of the A register). Then we
-decrement the Y register by 1, as this stores the number of iterations of the loop we are
-doing. If the result of this operation isn't zero, we jump back to the start, at memory
-location 6. If it is zero, we carry on to the next section.
+### Counter Program
 
-#### Completion and Output
-```commandline
-RMY 0 200           ; Load register Y with value at memory location 200
-HLT                 ; Halts the CPU
-```
-The number of times the A register overflowed has been stored in memory location 200, so we
-now read this back from memory into the Y register. Then we are complete, so halt the CPU.
+Demonstrates register overflow handling and long-running computation.
 
-#### Overflow Handling
-```commandline
-RMX 0 200           ; Load register X with value at memory location 200
-INX                 ; Increment register X by 1
-WMX 0 200           ; Write value of register X to memory location 200
-JMP 0 12            ; Jump to memory location 12
+```assembly
+; counters.cpu - Count until all registers overflow
+
+:START
+:A_INCREMENTER
+    INA           ; Increment A register
+    JNO START     ; If no overflow, continue
+    
+:X_INCREMENTER  
+    INX           ; A overflowed, increment X
+    JNO START     ; If X no overflow, restart
+    
+:Y_INCREMENTER
+    INY           ; X overflowed, increment Y  
+    JNO START     ; If Y no overflow, restart
+    
+:EXIT
+    HLT           ; All registers overflowed, halt
 ```
-We load the value from memory location which holds the number of times we have overflowed in
-to the X register. We then increment the X register by 1, save it back to memory location
-200, and jump back to memory location 12, continuing the main loop.
+
+**Key Concepts:**
+- Register overflow detection with `JNO` (Jump if No Overflow)
+- Cascading counter implementation
+- Long-running computation (33+ million ticks)
+
+## Intermediate Examples
+
+### Fibonacci Sequence Calculator
+
+Calculates Fibonacci numbers with overflow tracking to handle large results.
+
+```assembly
+; fibonacci.cpu - Calculate 12th Fibonacci number
+
+:START
+    LDY 12        ; Calculate 12th Fibonacci number
+    LDA 0         ; First Fibonacci number (F0)
+    LDX 1         ; Second Fibonacci number (F1)
+
+:LOOP
+    WMA $100      ; Store current A value
+    AAX           ; A = A + X (next Fibonacci number)
+    JMO OVERFLOW  ; Handle overflow if occurred
+    
+:CONTINUE
+    RMX $100      ; X = previous A value
+    DEY           ; Decrement counter
+    JNZ LOOP      ; Continue if not done
+    
+:COMPLETE
+    RMY $200      ; Load overflow count into Y
+    HLT           ; Finished - result in A, overflows in Y
+    
+:OVERFLOW
+    RMX $200      ; Load overflow counter
+    INX           ; Increment overflow count
+    WMX $200      ; Store overflow counter
+    JMP CONTINUE  ; Return to main calculation
+```
+
+**Program Structure:**
+- **Initialization**: Set up registers and counters
+- **Main Loop**: Calculate next Fibonacci number, check for overflow
+- **Overflow Handler**: Track number of overflows in memory
+- **Completion**: Result in A register, overflow count in Y register
+
+**Key Concepts:**
+- Memory usage for temporary storage (`$100`, `$200`)
+- Overflow detection and handling
+- Loop control with conditional jumps
+- Multi-byte result handling
+
+### Pattern Generator
+
+Creates alternating patterns in GPU memory for visual display.
+
+```assembly
+; pattern.cpu - Generate alternating space/asterisk pattern
+
+:INIT
+    LDA 32        ; Start with space character
+    LDX 96        ; Low byte of GPU start ($60)
+    LDY 240       ; High byte of GPU start ($F0)
+
+:WRITE_LOOP
+    WMI           ; Write character to memory[Y*256 + X]
+    
+    ; Toggle between space (32) and asterisk (42)
+    WMX $0910     ; Save X temporarily
+    LDX 32        ; Load space value
+    SAX           ; A = A - 32
+    JMZ SET_ASTERISK ; If A was space, change to asterisk
+    
+    LDA 32        ; A was asterisk, change to space
+    JMP RESTORE_X
+    
+:SET_ASTERISK
+    LDA 42        ; Set to asterisk character
+    
+:RESTORE_X
+    RMX $0910     ; Restore X position
+    
+    ; Advance to next position
+    INX           ; Increment X (column)
+    JNO WRITE_LOOP ; Continue if no overflow
+    
+    ; X overflowed, move to next row
+    LDX 0         ; Reset X to start of row
+    INY           ; Increment Y (row)
+    JNO WRITE_LOOP ; Continue if Y didn't overflow
+    
+    ; Filled entire display
+    HLT
+```
+
+**Key Concepts:**
+- Conditional logic with character toggling
+- 2D coordinate management (X,Y addressing)
+- Full screen memory filling
+- Temporary memory storage for register preservation
+
+## Programming Techniques
+
+### Memory Management
+
+```assembly
+; Temporary storage
+WMA $1000     ; Store A register at address $1000
+RMA $1000     ; Restore A register from address $1000
+
+; Indexed addressing for arrays/buffers
+LDY $10       ; High byte of base address
+LDX 50        ; Offset within array
+RMI           ; Read memory[base + offset] into A
+```
+
+### Loop Patterns
+
+```assembly
+; Counted loop
+LDY 10        ; Loop counter
+:LOOP_START
+    ; Loop body here
+    DEY           ; Decrement counter
+    JNZ LOOP_START ; Continue if not zero
+
+; Conditional loop
+:LOOP_START
+    ; Loop body
+    ; Set flags based on condition
+    JNZ LOOP_START ; Continue while condition true
+```
+
+### Subroutine Simulation
+
+```assembly
+; Save return address
+WPC $1FF0     ; Store program counter
+
+; Call subroutine
+JMP SUBROUTINE
+
+; Return from subroutine
+:SUBROUTINE
+    ; Subroutine code here
+    RPC $1FF0     ; Restore and jump to return address
+```
+
+## Error Handling Patterns
+
+### Overflow Management
+
+```assembly
+AAX           ; Perform addition
+JMO HANDLE_OVERFLOW ; Jump if overflow occurred
+; Normal processing continues here
+
+:HANDLE_OVERFLOW
+; Increment overflow counter, adjust result, etc.
+JMP CONTINUE_PROCESSING
+```
+
+### Bounds Checking
+
+```assembly
+; Check if value exceeds maximum
+EAX           ; Compare A with X (maximum value)
+JMZ WITHIN_BOUNDS ; Equal is OK
+; Additional logic for greater than check
+JMP ERROR_HANDLER
+
+:WITHIN_BOUNDS
+; Safe to proceed
+```
+
+## Performance Considerations
+
+- **Memory Access**: Direct register operations are faster than memory reads/writes
+- **Loop Optimization**: Minimize memory operations inside tight loops
+- **Flag Usage**: Plan instruction sequences to avoid unnecessary flag operations
+- **Jump Efficiency**: Use relative jumps when possible for shorter instruction sequences
+
+## Debugging Techniques
+
+1. **Strategic Halts**: Place `HLT` instructions to examine register states
+2. **Memory Dumps**: Store intermediate values in known memory locations
+3. **Counter Variables**: Use memory locations to track loop iterations or function calls
+4. **Character Output**: Write debug values as ASCII characters to the display
+
+These examples demonstrate the fundamental programming patterns needed to write effective programs for the CPU emulator. Each example builds upon basic concepts to create more sophisticated programs.
