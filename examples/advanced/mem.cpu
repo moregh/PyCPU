@@ -1,0 +1,705 @@
+; CPU Standard Library - Memory Functions
+; Implementation of memset, memcpy, and memcmp with proper calling conventions
+; Compatible with the stack implementation from stack.cpu
+;
+; This library provides:
+; - memset(dest, value, count): Fill memory with a value
+; - memcpy(dest, src, count): Copy memory from source to destination  
+; - memcmp(ptr1, ptr2, count): Compare two memory regions
+;
+; All functions use a standard calling convention:
+; - Parameters passed on stack (pushed right-to-left before call)
+; - Return values in A register
+; - Caller responsible for cleaning up stack
+; - Functions preserve all registers except A (return value)
+
+; Memory addresses for function parameters and local variables
+; Using high memory to avoid conflicts with user programs
+CONST PARAM_BASE $EF00          ; Base address for parameter passing
+CONST PARAM_DEST_LOW $EF00      ; Destination address (low byte)
+CONST PARAM_DEST_HIGH $EF01     ; Destination address (high byte)
+CONST PARAM_SRC_LOW $EF02       ; Source address (low byte) 
+CONST PARAM_SRC_HIGH $EF03      ; Source address (high byte)
+CONST PARAM_VALUE $EF04         ; Value parameter
+CONST PARAM_COUNT $EF05         ; Count parameter
+CONST TEMP_REG_A $EF10          ; Temporary storage for A
+CONST TEMP_REG_X $EF11          ; Temporary storage for X
+CONST TEMP_REG_Y $EF12          ; Temporary storage for Y
+CONST RETURN_ADDR_LOW $EF20     ; Return address (low byte)
+CONST RETURN_ADDR_HIGH $EF21    ; Return address (high byte)
+
+; Standard library initialization
+:STDLIB_INIT
+    ; Clear parameter area
+    LDA 0
+    LDX 0
+    LDY PARAM_BASE >> 8         ; High byte of parameter base
+    
+:CLEAR_PARAM_LOOP
+    WMI                         ; Write 0 to memory[Y*256 + X]
+    INX                         ; Next address
+    JNO CLEAR_PARAM_LOOP        ; Continue if no overflow
+    ; X overflowed, move to next page
+    INY
+    LDX 0
+    ; Check if we've cleared enough (32 bytes should be plenty)
+    LDA $EF
+    EAY                         ; Compare with current page
+    JMZ CLEAR_PARAM_DONE        ; Done if we're still on $EF page
+    LDA $F0
+    EAY                         ; Compare with $F0
+    JMZ CLEAR_PARAM_DONE        ; Done if we've moved to $F0
+    JMP CLEAR_PARAM_LOOP
+
+:CLEAR_PARAM_DONE
+    ; Library initialized
+    JMP STDLIB_RETURN
+
+;==============================================================================
+; MEMSET FUNCTION
+;==============================================================================
+; void memset(void* dest, int value, size_t count)
+; Fill 'count' bytes starting at 'dest' with 'value'
+; 
+; Parameters (passed via memory):
+;   PARAM_DEST_LOW/HIGH: Destination address (16-bit)  
+;   PARAM_VALUE: Fill value (8-bit)
+;   PARAM_COUNT: Number of bytes to fill (8-bit)
+;
+; Returns: A = 0 on success, A = 1 on error
+;
+; Stack-based calling convention:
+; Before calling memset, caller should:
+;   1. Push count onto stack
+;   2. Push value onto stack  
+;   3. Push dest_high onto stack
+;   4. Push dest_low onto stack
+;   5. Call memset
+;   6. Clean up stack (pop 4 bytes)
+
+:MEMSET
+    ; Save registers
+    WMA TEMP_REG_A
+    WMX TEMP_REG_X  
+    WMY TEMP_REG_Y
+
+    ; Extract parameters from stack
+    ; Stack layout: [dest_low, dest_high, value, count, ...]
+    ; We need to read from stack without popping
+    
+    ; Get stack pointer
+    RMA SP_LOW
+    CAX                         ; X = stack pointer low
+    RMA SP_HIGH  
+    CAY                         ; Y = stack pointer high
+    
+    ; Read dest_low (top of stack)
+    INX                         ; Move to first parameter
+    JNO MEMSET_READ_DEST_LOW
+    INY                         ; Handle X overflow
+    LDX 0
+:MEMSET_READ_DEST_LOW
+    RMI                         ; A = dest_low
+    WMA PARAM_DEST_LOW
+    
+    ; Read dest_high  
+    INX
+    JNO MEMSET_READ_DEST_HIGH
+    INY
+    LDX 0
+:MEMSET_READ_DEST_HIGH
+    RMI                         ; A = dest_high
+    WMA PARAM_DEST_HIGH
+    
+    ; Read value
+    INX
+    JNO MEMSET_READ_VALUE
+    INY
+    LDX 0
+:MEMSET_READ_VALUE
+    RMI                         ; A = value
+    WMA PARAM_VALUE
+    
+    ; Read count
+    INX
+    JNO MEMSET_READ_COUNT
+    INY  
+    LDX 0
+:MEMSET_READ_COUNT
+    RMI                         ; A = count
+    WMA PARAM_COUNT
+    
+    ; Validate parameters
+    RMA PARAM_COUNT
+    LDX 0
+    EAX                         ; Compare count with 0
+    JMZ MEMSET_SUCCESS          ; If count is 0, nothing to do
+    
+    ; Set up destination address in X,Y registers
+    RMA PARAM_DEST_HIGH
+    CAY                         ; Y = dest_high
+    RMA PARAM_DEST_LOW
+    CAX                         ; X = dest_low
+    
+    ; Get fill value and count
+    RMA PARAM_VALUE
+    WMA TEMP_REG_A              ; Store fill value
+    RMA PARAM_COUNT
+    ; A now contains count, TEMP_REG_A contains fill value
+
+:MEMSET_FILL_LOOP
+    ; Check if count is zero
+    LDX 0
+    EAX                         ; Compare A (count) with 0
+    JMZ MEMSET_SUCCESS          ; Done if count is 0
+    
+    ; Write fill value to memory
+    RMX TEMP_REG_A              ; X = fill value
+    CXA                         ; A = fill value (for writing)
+    
+    ; Get destination address back into Y,X
+    RMY PARAM_DEST_HIGH
+    RMX PARAM_DEST_LOW
+    
+    ; Write byte
+    WMI                         ; Write A to memory[Y*256 + X]
+    
+    ; Increment destination address
+    INX                         ; Increment low byte
+    JNO MEMSET_NO_CARRY
+    ; Handle carry to high byte
+    INY
+    LDX 0                       ; Reset low byte
+    ; Store updated high byte
+    CYA
+    WMA PARAM_DEST_HIGH
+    LDX 0                       ; Restore X
+    
+:MEMSET_NO_CARRY
+    ; Store updated low byte
+    CXA
+    WMA PARAM_DEST_LOW
+    
+    ; Decrement count and continue
+    RMA PARAM_COUNT
+    DEA                         ; count--
+    WMA PARAM_COUNT
+    JMP MEMSET_FILL_LOOP
+
+:MEMSET_SUCCESS
+    ; Restore registers
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    
+    ; Return success (A = 0)
+    LDA 0
+    JMP STDLIB_RETURN
+
+:MEMSET_ERROR
+    ; Restore registers  
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    
+    ; Return error (A = 1)
+    LDA 1
+    JMP STDLIB_RETURN
+
+;==============================================================================
+; MEMCPY FUNCTION  
+;==============================================================================
+; void memcpy(void* dest, const void* src, size_t count)
+; Copy 'count' bytes from 'src' to 'dest'
+;
+; Parameters (passed via memory):
+;   PARAM_DEST_LOW/HIGH: Destination address (16-bit)
+;   PARAM_SRC_LOW/HIGH: Source address (16-bit)
+;   PARAM_COUNT: Number of bytes to copy (8-bit)
+;
+; Returns: A = 0 on success, A = 1 on error
+;
+; Stack-based calling convention:
+; Before calling memcpy, caller should:
+;   1. Push count onto stack
+;   2. Push src_high onto stack
+;   3. Push src_low onto stack
+;   4. Push dest_high onto stack  
+;   5. Push dest_low onto stack
+;   6. Call memcpy
+;   7. Clean up stack (pop 5 bytes)
+
+:MEMCPY
+    ; Save registers
+    WMA TEMP_REG_A
+    WMX TEMP_REG_X
+    WMY TEMP_REG_Y
+    
+    ; Extract parameters from stack
+    ; Stack layout: [dest_low, dest_high, src_low, src_high, count, ...]
+    
+    ; Get stack pointer
+    RMA SP_LOW
+    CAX                         ; X = stack pointer low
+    RMA SP_HIGH
+    CAY                         ; Y = stack pointer high
+    
+    ; Read dest_low
+    INX
+    JNO MEMCPY_READ_DEST_LOW
+    INY
+    LDX 0
+:MEMCPY_READ_DEST_LOW
+    RMI
+    WMA PARAM_DEST_LOW
+    
+    ; Read dest_high
+    INX
+    JNO MEMCPY_READ_DEST_HIGH
+    INY
+    LDX 0
+:MEMCPY_READ_DEST_HIGH
+    RMI
+    WMA PARAM_DEST_HIGH
+    
+    ; Read src_low
+    INX
+    JNO MEMCPY_READ_SRC_LOW
+    INY
+    LDX 0
+:MEMCPY_READ_SRC_LOW
+    RMI
+    WMA PARAM_SRC_LOW
+    
+    ; Read src_high
+    INX
+    JNO MEMCPY_READ_SRC_HIGH
+    INY
+    LDX 0
+:MEMCPY_READ_SRC_HIGH  
+    RMI
+    WMA PARAM_SRC_HIGH
+    
+    ; Read count
+    INX
+    JNO MEMCPY_READ_COUNT
+    INY
+    LDX 0
+:MEMCPY_READ_COUNT
+    RMI
+    WMA PARAM_COUNT
+    
+    ; Validate parameters
+    RMA PARAM_COUNT
+    LDX 0
+    EAX                         ; Compare count with 0
+    JMZ MEMCPY_SUCCESS          ; If count is 0, nothing to do
+
+:MEMCPY_LOOP
+    ; Check if count is zero
+    RMA PARAM_COUNT
+    LDX 0
+    EAX
+    JMZ MEMCPY_SUCCESS          ; Done if count is 0
+    
+    ; Read byte from source
+    RMA PARAM_SRC_HIGH
+    CAY                         ; Y = src_high
+    RMA PARAM_SRC_LOW
+    CAX                         ; X = src_low
+    RMI                         ; A = memory[Y*256 + X]
+    WMA TEMP_REG_A              ; Save the byte
+    
+    ; Write byte to destination
+    RMA PARAM_DEST_HIGH
+    CAY                         ; Y = dest_high
+    RMA PARAM_DEST_LOW
+    CAX                         ; X = dest_low
+    RMA TEMP_REG_A              ; A = the byte to write
+    WMI                         ; Write A to memory[Y*256 + X]
+    
+    ; Increment source address
+    RMA PARAM_SRC_LOW
+    INA                         ; src_low++
+    WMA PARAM_SRC_LOW
+    JNO MEMCPY_SRC_NO_CARRY
+    ; Handle carry
+    RMA PARAM_SRC_HIGH
+    INA                         ; src_high++
+    WMA PARAM_SRC_HIGH
+    
+:MEMCPY_SRC_NO_CARRY
+    ; Increment destination address
+    RMA PARAM_DEST_LOW
+    INA                         ; dest_low++
+    WMA PARAM_DEST_LOW
+    JNO MEMCPY_DEST_NO_CARRY
+    ; Handle carry
+    RMA PARAM_DEST_HIGH
+    INA                         ; dest_high++
+    WMA PARAM_DEST_HIGH
+    
+:MEMCPY_DEST_NO_CARRY
+    ; Decrement count
+    RMA PARAM_COUNT
+    DEA                         ; count--
+    WMA PARAM_COUNT
+    JMP MEMCPY_LOOP
+
+:MEMCPY_SUCCESS
+    ; Restore registers
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    
+    ; Return success (A = 0)
+    LDA 0
+    JMP STDLIB_RETURN
+
+;==============================================================================
+; MEMCMP FUNCTION
+;==============================================================================
+; int memcmp(const void* ptr1, const void* ptr2, size_t count)
+; Compare 'count' bytes between 'ptr1' and 'ptr2'
+;
+; Parameters (passed via memory):
+;   PARAM_DEST_LOW/HIGH: First pointer address (16-bit)
+;   PARAM_SRC_LOW/HIGH: Second pointer address (16-bit)  
+;   PARAM_COUNT: Number of bytes to compare (8-bit)
+;
+; Returns: 
+;   A = 0 if memory regions are equal
+;   A = 1 if first difference has ptr1[i] > ptr2[i]
+;   A = 255 (-1) if first difference has ptr1[i] < ptr2[i]
+;
+; Stack-based calling convention:
+; Before calling memcmp, caller should:
+;   1. Push count onto stack
+;   2. Push ptr2_high onto stack
+;   3. Push ptr2_low onto stack
+;   4. Push ptr1_high onto stack
+;   5. Push ptr1_low onto stack  
+;   6. Call memcmp
+;   7. Clean up stack (pop 5 bytes)
+
+:MEMCMP
+    ; Save registers
+    WMA TEMP_REG_A
+    WMX TEMP_REG_X
+    WMY TEMP_REG_Y
+    
+    ; Extract parameters from stack (same layout as memcpy)
+    RMA SP_LOW
+    CAX
+    RMA SP_HIGH
+    CAY
+    
+    ; Read ptr1_low
+    INX
+    JNO MEMCMP_READ_PTR1_LOW
+    INY
+    LDX 0
+:MEMCMP_READ_PTR1_LOW
+    RMI
+    WMA PARAM_DEST_LOW          ; Reuse DEST for ptr1
+    
+    ; Read ptr1_high
+    INX
+    JNO MEMCMP_READ_PTR1_HIGH
+    INY
+    LDX 0
+:MEMCMP_READ_PTR1_HIGH
+    RMI
+    WMA PARAM_DEST_HIGH
+    
+    ; Read ptr2_low
+    INX
+    JNO MEMCMP_READ_PTR2_LOW
+    INY
+    LDX 0
+:MEMCMP_READ_PTR2_LOW
+    RMI
+    WMA PARAM_SRC_LOW           ; Reuse SRC for ptr2
+    
+    ; Read ptr2_high
+    INX
+    JNO MEMCMP_READ_PTR2_HIGH
+    INY
+    LDX 0
+:MEMCMP_READ_PTR2_HIGH
+    RMI
+    WMA PARAM_SRC_HIGH
+    
+    ; Read count
+    INX
+    JNO MEMCMP_READ_COUNT
+    INY
+    LDX 0
+:MEMCMP_READ_COUNT
+    RMI
+    WMA PARAM_COUNT
+    
+    ; Validate parameters
+    RMA PARAM_COUNT
+    LDX 0
+    EAX
+    JMZ MEMCMP_EQUAL            ; If count is 0, they're equal
+
+:MEMCMP_LOOP
+    ; Check if count is zero
+    RMA PARAM_COUNT
+    LDX 0
+    EAX
+    JMZ MEMCMP_EQUAL            ; Equal if we've compared all bytes
+    
+    ; Read byte from ptr1
+    RMA PARAM_DEST_HIGH
+    CAY                         ; Y = ptr1_high  
+    RMA PARAM_DEST_LOW
+    CAX                         ; X = ptr1_low
+    RMI                         ; A = ptr1[i]
+    WMA TEMP_REG_A              ; Save ptr1[i]
+    
+    ; Read byte from ptr2
+    RMA PARAM_SRC_HIGH
+    CAY                         ; Y = ptr2_high
+    RMA PARAM_SRC_LOW  
+    CAX                         ; X = ptr2_low
+    RMI                         ; A = ptr2[i]
+    
+    ; Compare bytes: ptr1[i] vs ptr2[i]
+    RMX TEMP_REG_A              ; X = ptr1[i]
+    EAX                         ; Compare A (ptr2[i]) with X (ptr1[i])
+    JNZ MEMCMP_NOT_EQUAL        ; If not equal, determine which is greater
+    
+    ; Bytes are equal, continue to next byte
+    ; Increment ptr1 address
+    RMA PARAM_DEST_LOW
+    INA
+    WMA PARAM_DEST_LOW
+    JNO MEMCMP_PTR1_NO_CARRY
+    RMA PARAM_DEST_HIGH
+    INA
+    WMA PARAM_DEST_HIGH
+    
+:MEMCMP_PTR1_NO_CARRY
+    ; Increment ptr2 address  
+    RMA PARAM_SRC_LOW
+    INA
+    WMA PARAM_SRC_LOW
+    JNO MEMCMP_PTR2_NO_CARRY
+    RMA PARAM_SRC_HIGH
+    INA
+    WMA PARAM_SRC_HIGH
+    
+:MEMCMP_PTR2_NO_CARRY
+    ; Decrement count
+    RMA PARAM_COUNT
+    DEA
+    WMA PARAM_COUNT
+    JMP MEMCMP_LOOP
+
+:MEMCMP_NOT_EQUAL
+    ; A = ptr2[i], X = ptr1[i]
+    ; We need to determine if ptr1[i] > ptr2[i] or ptr1[i] < ptr2[i]
+    SAX                         ; A = ptr2[i] - ptr1[i]
+    JMN MEMCMP_PTR1_GREATER     ; If result is negative, ptr1 > ptr2
+    ; Otherwise ptr2 >= ptr1, so ptr1 < ptr2
+    JMP MEMCMP_PTR1_LESS
+
+:MEMCMP_PTR1_GREATER
+    ; ptr1[i] > ptr2[i], return 1
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    LDA 1
+    JMP STDLIB_RETURN
+
+:MEMCMP_PTR1_LESS
+    ; ptr1[i] < ptr2[i], return -1 (255)
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    LDA 255
+    JMP STDLIB_RETURN
+
+:MEMCMP_EQUAL
+    ; All bytes are equal, return 0
+    RMA TEMP_REG_X
+    CAX
+    RMA TEMP_REG_Y
+    CAY
+    LDA 0
+    JMP STDLIB_RETURN
+
+;==============================================================================
+; HELPER FUNCTIONS FOR STACK-BASED CALLING
+;==============================================================================
+
+; Helper function to push 16-bit address onto stack
+; Input: A = low byte, X = high byte
+; Modifies stack pointer
+:PUSH_ADDRESS
+    ; Push high byte first (since stack grows down)
+    WMA TEMP_REG_A              ; Save low byte
+    CXA                         ; A = high byte
+    JMP STACK_PUSH_A            ; Push high byte
+    
+    ; Push low byte  
+    RMA TEMP_REG_A              ; A = low byte
+    JMP STACK_PUSH_A            ; Push low byte
+
+; Helper function to push 8-bit value onto stack
+; Input: A = value
+; Modifies stack pointer  
+:PUSH_BYTE
+    JMP STACK_PUSH_A
+
+; Helper function to pop multiple bytes from stack
+; Input: A = number of bytes to pop
+; Modifies stack pointer
+:POP_BYTES
+    WMA TEMP_REG_A              ; Save byte count
+    
+:POP_BYTES_LOOP
+    RMA TEMP_REG_A
+    LDX 0
+    EAX                         ; Check if count is 0
+    JMZ STDLIB_RETURN           ; Done if count is 0
+    
+    JMP STACK_POP_A             ; Pop one byte (result ignored)
+    
+    RMA TEMP_REG_A
+    DEA                         ; count--
+    WMA TEMP_REG_A
+    JMP POP_BYTES_LOOP
+
+;==============================================================================
+; EXAMPLE USAGE AND TEST CASES
+;==============================================================================
+
+; Example of how to call memset to fill 10 bytes at address $2000 with value 42
+:EXAMPLE_MEMSET_CALL
+    ; Push parameters in reverse order (right to left)
+    LDA 10                      ; count
+    JMP STACK_PUSH_A
+    
+    LDA 42                      ; value
+    JMP STACK_PUSH_A
+    
+    LDA $20                     ; dest_high  
+    JMP STACK_PUSH_A
+    
+    LDA $00                     ; dest_low
+    JMP STACK_PUSH_A
+    
+    ; Call memset
+    JMP MEMSET
+    
+    ; Clean up stack (pop 4 bytes)
+    LDA 4
+    JMP POP_BYTES
+    
+    ; Result is in A register (0 = success, 1 = error)
+    JMP STDLIB_RETURN
+
+; Example of how to call memcpy to copy 5 bytes from $1000 to $2000
+:EXAMPLE_MEMCPY_CALL
+    ; Push parameters in reverse order
+    LDA 5                       ; count
+    JMP STACK_PUSH_A
+    
+    LDA $10                     ; src_high
+    JMP STACK_PUSH_A
+    
+    LDA $00                     ; src_low
+    JMP STACK_PUSH_A
+    
+    LDA $20                     ; dest_high
+    JMP STACK_PUSH_A
+    
+    LDA $00                     ; dest_low  
+    JMP STACK_PUSH_A
+    
+    ; Call memcpy
+    JMP MEMCPY
+    
+    ; Clean up stack (pop 5 bytes)
+    LDA 5
+    JMP POP_BYTES
+    
+    ; Result is in A register (0 = success, 1 = error)
+    JMP STDLIB_RETURN
+
+; Example of how to call memcmp to compare 3 bytes between $1000 and $2000
+:EXAMPLE_MEMCMP_CALL
+    ; Push parameters in reverse order
+    LDA 3                       ; count
+    JMP STACK_PUSH_A
+    
+    LDA $20                     ; ptr2_high
+    JMP STACK_PUSH_A
+    
+    LDA $00                     ; ptr2_low
+    JMP STACK_PUSH_A
+    
+    LDA $10                     ; ptr1_high
+    JMP STACK_PUSH_A
+    
+    LDA $00                     ; ptr1_low
+    JMP STACK_PUSH_A
+    
+    ; Call memcmp
+    JMP MEMCMP
+    
+    ; Clean up stack (pop 5 bytes)
+    LDA 5
+    JMP POP_BYTES
+    
+    ; Result is in A register:
+    ; 0 = equal, 1 = ptr1 > ptr2, 255 = ptr1 < ptr2
+    JMP STDLIB_RETURN
+
+;==============================================================================
+; STDLIB COMMON RETURN POINT
+;==============================================================================
+
+:STDLIB_RETURN
+    ; Common return point for all stdlib functions
+    ; Result should be in A register
+    NOP                         ; Placeholder for actual return mechanism
+    ; In practice, this would jump to caller's return address
+    ; For now, programs can JMP to specific functions and continue from here
+
+;==============================================================================
+; INTEGRATION WITH STACK.CPU
+;==============================================================================
+; This library is designed to work with the stack implementation from
+; examples/intermediate/stack.cpu. To use this library:
+;
+; 1. Include the stack.cpu implementation in your program
+; 2. Initialize the stack system by jumping to STACK_INIT  
+; 3. Initialize this stdlib by jumping to STDLIB_INIT
+; 4. Use the memory functions as shown in the examples above
+;
+; The functions expect the following stack functions to be available:
+; - STACK_PUSH_A: Push A register onto stack
+; - STACK_POP_A: Pop from stack into A register  
+; - SP_LOW/SP_HIGH: Stack pointer storage locations
+;
+; Memory layout considerations:
+; - This library uses $EF00-$EF21 for parameters and temporaries
+; - Stack system uses $EE00-$EEFF for stack management
+; - User programs should avoid these ranges
+; - GPU memory (if present) starts at $F060
+;
+; Error handling:
+; - All functions return 0 for success, non-zero for errors
+; - Functions preserve registers X and Y
+; - A register contains return value
+; - Stack cleanup is caller's responsibility
