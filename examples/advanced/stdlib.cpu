@@ -1,0 +1,433 @@
+; CPU Standard Library - Memory Functions with Dynamic Call/Return
+; memset, memcpy, memcmp with automatic return address calculation
+
+; Memory layout
+CONST SP_LOW $EE00
+CONST SP_HIGH $EE01
+CONST TEMP_A $EE10
+CONST TEMP_X $EE11
+CONST TEMP_Y $EE12
+CONST RET_ADDR_LOW $EE13
+CONST RET_ADDR_HIGH $EE14
+CONST TEMP_PTR_LOW $EE15
+CONST TEMP_PTR_HIGH $EE16
+
+; Stack bounds  
+CONST STACK_TOP_HIGH $ED
+CONST STACK_TOP_LOW $FF
+
+;==============================================================================
+; INITIALIZATION
+;==============================================================================
+
+:INIT
+    ; Initialize stack pointer to top
+    LDA STACK_TOP_HIGH
+    WMA SP_HIGH
+    LDA STACK_TOP_LOW
+    WMA SP_LOW
+    JMP USER_MAIN
+
+;==============================================================================
+; STACK OPERATIONS
+;==============================================================================
+
+:PUSH
+    ; Push A register onto stack
+    WMA TEMP_A
+    
+    ; Get current SP
+    RMA SP_HIGH
+    CAY
+    RMA SP_LOW
+    CAX
+    
+    ; Write value to stack
+    RMA TEMP_A
+    WMI
+    
+    ; Decrement SP
+    DEX
+    JNN PUSH_UPDATE_SP
+    DEY
+    LDX $FF
+    
+:PUSH_UPDATE_SP
+    CXA
+    WMA SP_LOW
+    CYA
+    WMA SP_HIGH
+    NOP
+
+:POP
+    ; Pop from stack into A register
+    RMA SP_HIGH
+    CAY
+    RMA SP_LOW
+    CAX
+    
+    ; Increment SP first
+    INX
+    JNO POP_READ
+    INY
+    LDX 0
+    
+:POP_READ
+    CXA
+    WMA SP_LOW
+    CYA
+    WMA SP_HIGH
+    RMI
+    NOP
+
+;==============================================================================
+; DYNAMIC CALL/RETURN SYSTEM
+;==============================================================================
+
+; CALL macro - use this before jumping to functions
+; Usage: 
+;   WPC RET_ADDR_LOW    ; Save current PC
+;   JMP function_name
+; The function will return to the instruction after the JMP
+
+:RETURN
+    ; Return to saved address
+    RPC RET_ADDR_LOW
+    NOP
+
+;==============================================================================
+; MEMORY FUNCTIONS - DIRECT CALLABLE
+;==============================================================================
+
+:MEMSET
+    ; Fill memory: memset(addr, value, count)
+    ; Stack: [..., count, value, addr_high, addr_low]
+    ; Call with: push params, WPC RET_ADDR_LOW, JMP MEMSET
+    
+    WMX TEMP_X
+    WMY TEMP_Y
+    
+    ; Pop parameters
+    JMP POP             ; addr_low
+    WMA TEMP_A
+    JMP POP             ; addr_high
+    CAY
+    RMA TEMP_A
+    CAX                 ; Y:X = destination address
+    
+    JMP POP             ; value
+    WMA TEMP_A
+    JMP POP             ; count
+    
+:MEMSET_LOOP
+    ; Check if count is zero
+    LDX 0
+    EAX
+    JMZ MEMSET_DONE
+    
+    ; Write value
+    RMX TEMP_A
+    CXA
+    WMI
+    
+    ; Increment address
+    INX
+    JNO MEMSET_NO_CARRY
+    INY
+    
+:MEMSET_NO_CARRY
+    ; Decrement count
+    DEA
+    JMP MEMSET_LOOP
+    
+:MEMSET_DONE
+    RMX TEMP_X
+    RMY TEMP_Y
+    LDA 0               ; Return success
+    JMP RETURN
+
+:MEMCPY
+    ; Copy memory: memcpy(dest, src, count)  
+    ; Stack: [..., count, src_high, src_low, dest_high, dest_low]
+    ; Call with: push params, WPC RET_ADDR_LOW, JMP MEMCPY
+    
+    WMX TEMP_X
+    WMY TEMP_Y
+    
+    ; Pop dest address
+    JMP POP
+    WMA TEMP_PTR_LOW
+    JMP POP
+    WMA TEMP_PTR_HIGH
+    
+    ; Pop src address into Y:X
+    JMP POP
+    CAX
+    JMP POP
+    CAY
+    
+    JMP POP             ; count
+    
+:MEMCPY_LOOP
+    ; Check count
+    LDX 0
+    EAX
+    JMZ MEMCPY_DONE
+    
+    ; Read from source (Y:X)
+    RMI
+    WMA TEMP_A
+    
+    ; Write to destination
+    RMA TEMP_PTR_HIGH
+    CAY
+    RMA TEMP_PTR_LOW
+    CAX
+    RMA TEMP_A
+    WMI
+    
+    ; Increment destination
+    INX
+    JNO MEMCPY_DEST_OK
+    INY
+    
+:MEMCPY_DEST_OK
+    CXA
+    WMA TEMP_PTR_LOW
+    CYA
+    WMA TEMP_PTR_HIGH
+    
+    ; Increment source (get original Y:X back)
+    RMA TEMP_PTR_HIGH
+    CAY
+    RMA TEMP_PTR_LOW
+    CAX
+    INX
+    JNO MEMCPY_SRC_OK
+    INY
+    
+:MEMCPY_SRC_OK
+    ; Decrement count
+    DEA
+    JMP MEMCPY_LOOP
+    
+:MEMCPY_DONE
+    RMX TEMP_X
+    RMY TEMP_Y
+    LDA 0
+    JMP RETURN
+
+:MEMCMP
+    ; Compare memory: memcmp(ptr1, ptr2, count)
+    ; Stack: [..., count, ptr2_high, ptr2_low, ptr1_high, ptr1_low]
+    ; Call with: push params, WPC RET_ADDR_LOW, JMP MEMCMP
+    
+    WMX TEMP_X
+    WMY TEMP_Y
+    
+    ; Pop ptr1 into Y:X
+    JMP POP
+    CAX
+    JMP POP
+    CAY
+    
+    ; Pop ptr2 into temps
+    JMP POP
+    WMA TEMP_PTR_LOW
+    JMP POP
+    WMA TEMP_PTR_HIGH
+    
+    JMP POP             ; count
+    
+:MEMCMP_LOOP
+    ; Check count
+    LDX 0
+    EAX
+    JMZ MEMCMP_EQUAL
+    
+    ; Read from ptr1 (Y:X)
+    RMI
+    WMA TEMP_A
+    
+    ; Read from ptr2
+    RMA TEMP_PTR_HIGH
+    CAY
+    RMA TEMP_PTR_LOW
+    CAX
+    RMI
+    
+    ; Compare bytes
+    RMX TEMP_A
+    EAX
+    JNZ MEMCMP_DIFFERENT
+    
+    ; Increment ptr2
+    INX
+    JNO MEMCMP_PTR2_OK
+    INY
+    
+:MEMCMP_PTR2_OK
+    CXA
+    WMA TEMP_PTR_LOW
+    CYA
+    WMA TEMP_PTR_HIGH
+    
+    ; Increment ptr1 (restore Y:X)
+    RMA TEMP_A          ; Get original ptr1 values
+    CAY
+    RMA TEMP_X
+    CAX
+    INX
+    JNO MEMCMP_PTR1_OK
+    INY
+    
+:MEMCMP_PTR1_OK
+    CXA
+    WMA TEMP_X
+    CYA
+    WMA TEMP_A
+    
+    ; Decrement count
+    DEA
+    JMP MEMCMP_LOOP
+    
+:MEMCMP_DIFFERENT
+    ; A = ptr2 byte, X = ptr1 byte
+    SAX
+    JMN MEMCMP_PTR1_GREATER
+    LDA 255
+    JMP MEMCMP_RETURN
+    
+:MEMCMP_PTR1_GREATER
+    LDA 1
+    JMP MEMCMP_RETURN
+    
+:MEMCMP_EQUAL
+    LDA 0
+    
+:MEMCMP_RETURN
+    RMX TEMP_X
+    RMY TEMP_Y
+    JMP RETURN
+
+;==============================================================================
+; SIMPLIFIED CALLING MACROS (use these in your code)
+;==============================================================================
+
+; Call memset(addr, value, count)
+:CALL_MEMSET_INLINE
+    ; Push parameters first
+    LDA 5               ; count
+    JMP PUSH
+    LDA 42              ; value
+    JMP PUSH
+    LDA $20             ; addr_high
+    JMP PUSH
+    LDA $00             ; addr_low
+    JMP PUSH
+    
+    ; Save return address and call
+    WPC RET_ADDR_LOW
+    JMP MEMSET
+    
+    ; Execution continues here
+    NOP
+
+; Call memcpy(dest, src, count)  
+:CALL_MEMCPY_INLINE
+    LDA 3               ; count
+    JMP PUSH
+    LDA $20             ; src_high
+    JMP PUSH
+    LDA $00             ; src_low
+    JMP PUSH
+    LDA $21             ; dest_high
+    JMP PUSH
+    LDA $00             ; dest_low
+    JMP PUSH
+    
+    WPC RET_ADDR_LOW
+    JMP MEMCPY
+    NOP
+
+; Call memcmp(ptr1, ptr2, count)
+:CALL_MEMCMP_INLINE
+    LDA 3               ; count
+    JMP PUSH
+    LDA $21             ; ptr2_high
+    JMP PUSH
+    LDA $00             ; ptr2_low
+    JMP PUSH
+    LDA $20             ; ptr1_high
+    JMP PUSH
+    LDA $00             ; ptr1_low
+    JMP PUSH
+    
+    WPC RET_ADDR_LOW
+    JMP MEMCMP
+    NOP
+
+;==============================================================================
+; USER PROGRAM
+;==============================================================================
+
+:USER_MAIN
+    ; Test all three functions using the inline call examples
+    JMP CALL_MEMSET_INLINE
+    WMA $3000           ; Store memset result
+    
+    JMP CALL_MEMCPY_INLINE
+    WMA $3001           ; Store memcpy result
+    
+    JMP CALL_MEMCMP_INLINE
+    WMA $3002           ; Store memcmp result (should be 0 = equal)
+    
+    HLT
+
+;==============================================================================
+; ADVANCED USAGE EXAMPLE
+;==============================================================================
+
+:ADVANCED_EXAMPLE
+    ; Clear a 256-byte buffer at $4000
+    LDA 255             ; count (almost full page)
+    JMP PUSH
+    LDA 0               ; value (zero)
+    JMP PUSH
+    LDA $40             ; addr_high
+    JMP PUSH
+    LDA $00             ; addr_low
+    JMP PUSH
+    WPC RET_ADDR_LOW
+    JMP MEMSET
+    
+    ; Copy some data into it
+    LDA 10              ; count
+    JMP PUSH
+    LDA $20             ; src_high (from our previous test)
+    JMP PUSH
+    LDA $00             ; src_low
+    JMP PUSH
+    LDA $40             ; dest_high
+    JMP PUSH
+    LDA $10             ; dest_low (offset into buffer)
+    JMP PUSH
+    WPC RET_ADDR_LOW
+    JMP MEMCPY
+    
+    ; Verify it matches
+    LDA 10              ; count
+    JMP PUSH
+    LDA $40             ; ptr2_high
+    JMP PUSH
+    LDA $10             ; ptr2_low
+    JMP PUSH
+    LDA $20             ; ptr1_high
+    JMP PUSH
+    LDA $00             ; ptr1_low
+    JMP PUSH
+    WPC RET_ADDR_LOW
+    JMP MEMCMP
+    
+    ; A now contains comparison result
+    HLT
