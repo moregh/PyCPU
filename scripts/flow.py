@@ -111,14 +111,21 @@ class ControlFlowAnalyzer:
         return controlling_label
     
     def build_address_to_label_map(self, labels: Dict[str, int], 
-                                 instructions: List[Tuple[int, str, int]]) -> Dict[int, str]:
-        """Build a map from each instruction address to its controlling label"""
+                                 instructions: List[Tuple[int, str, int]]) -> Tuple[Dict[int, str], Dict[int, List[str]]]:
+        """Build a map from each instruction address to its controlling label and track all labels at each address"""
         address_to_label = {}
+        address_to_all_labels = {}  # Track all labels at each address
         
         # Add entry point if address 0 doesn't have a label
         all_labels = dict(labels)
         if 0 not in all_labels.values():
             all_labels["__entry"] = 0
+        
+        # Build reverse mapping: address -> list of labels at that address
+        for label, addr in all_labels.items():
+            if addr not in address_to_all_labels:
+                address_to_all_labels[addr] = []
+            address_to_all_labels[addr].append(label)
         
         # Sort labels by address
         sorted_labels = sorted(all_labels.items(), key=lambda x: x[1])
@@ -139,7 +146,7 @@ class ControlFlowAnalyzer:
             
             address_to_label[addr] = controlling_label
         
-        return address_to_label
+        return address_to_label, address_to_all_labels
     
     def extract_jump_targets(self, instructions: List[Tuple[int, str, int]], 
                            labels: Dict[str, int]) -> Dict[int, List[Tuple[str, str]]]:
@@ -215,7 +222,7 @@ class ControlFlowAnalyzer:
             Dict mapping source labels to list of (target_label, edge_type) tuples
         """
         # Build address to label mapping
-        address_to_label = self.build_address_to_label_map(labels, instructions)
+        address_to_label, address_to_all_labels = self.build_address_to_label_map(labels, instructions)
         jumps = self.extract_jump_targets(instructions, labels)
         
         # Add entry point if not present
@@ -228,6 +235,33 @@ class ControlFlowAnalyzer:
         # Initialize graph with all labels
         for label in all_labels:
             graph[label] = []
+        
+        # Create fall-through edges between consecutive labels at the same address
+        # Sort addresses that have labels
+        labeled_addresses = sorted(address_to_all_labels.keys())
+        for addr in labeled_addresses:
+            labels_at_addr = address_to_all_labels[addr]
+            if len(labels_at_addr) > 1:
+                # For labels at the same address, we need to determine the execution order
+                # The first label defined is the entry point, subsequent labels are fall-through targets
+                # Sort by the original order they appear in the source (use original labels dict order)
+                original_order = []
+                for label in labels.keys():  # This preserves the order from the source file
+                    if label in labels_at_addr:
+                        original_order.append(label)
+                
+                # Add any remaining labels (like __entry) at the end
+                for label in labels_at_addr:
+                    if label not in original_order:
+                        original_order.append(label)
+                
+                # Create fall-through edges: first label flows to second, second to third, etc.
+                for i in range(len(original_order) - 1):
+                    source_label = original_order[i]
+                    target_label = original_order[i + 1]
+                    edge = (target_label, 'fallthrough')
+                    if edge not in graph[source_label]:
+                        graph[source_label].append(edge)
         
         # Process each instruction to find control flow between labels
         for addr, instruction, line_num in instructions:
