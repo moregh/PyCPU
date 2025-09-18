@@ -1,0 +1,680 @@
+; Software Stack Implementation for 64KiB CPU
+; Complete stack management using reserved memory locations
+;
+; Memory Layout:
+; Stack Area: $E000-$EDFF (3584 bytes, grows downward)
+; System Variables: $EE00-$EEFF
+; Stack Pointer: $EE00-$EE01 (16-bit)
+; Frame Pointer: $EE02-$EE03 (16-bit)
+; Stack Base: $EE80-$EE81 (16-bit)
+
+; Constants for memory locations
+CONST SP_LOW $EE00          ; Stack pointer low byte
+CONST SP_HIGH $EE01         ; Stack pointer high byte  
+CONST FP_LOW $EE02          ; Frame pointer low byte
+CONST FP_HIGH $EE03         ; Frame pointer high byte
+CONST STACK_BASE_LOW $EE80  ; Stack base address low
+CONST STACK_BASE_HIGH $EE81 ; Stack base address high
+CONST SYSTEM_FLAGS $EE10    ; System flags register
+CONST EXIT_CODE $EE11       ; Exit/error code
+CONST TEMP_STORE $EE90      ; Temporary storage for operations
+
+; Stack memory bounds
+CONST STACK_START_HIGH $ED  ; Top of stack (high byte)
+CONST STACK_START_LOW $FF   ; Top of stack (low byte)
+CONST STACK_END_HIGH $E0    ; Bottom of stack (high byte)
+CONST STACK_END_LOW $00     ; Bottom of stack (low byte)
+
+; System flag bits
+CONST FLAG_STACK_OVERFLOW 1
+CONST FLAG_STACK_UNDERFLOW 2
+CONST FLAG_INVALID_FRAME 4
+
+;==============================================================================
+; STACK INITIALIZATION
+;==============================================================================
+
+:STACK_INIT
+; Initialize stack pointer to top of stack area
+LDA STACK_START_HIGH
+WMA SP_HIGH
+LDA STACK_START_LOW  
+WMA SP_LOW
+
+; Initialize frame pointer to same location
+LDA STACK_START_HIGH
+WMA FP_HIGH
+LDA STACK_START_LOW
+WMA FP_LOW
+
+; Set stack base address
+LDA STACK_END_HIGH
+WMA STACK_BASE_HIGH
+LDA STACK_END_LOW
+WMA STACK_BASE_LOW
+
+; Clear system flags
+LDA 0
+WMA SYSTEM_FLAGS
+WMA EXIT_CODE
+
+; Jump to user program entry point
+JMP __MAIN
+
+;==============================================================================
+; BASIC STACK OPERATIONS
+;==============================================================================
+
+; Push A register onto stack
+; Modifies: Stack pointer, memory at stack location
+; Preserves: A register value
+; Sets system flags on overflow
+:STACK_PUSH_A
+; Save A value temporarily
+WMA TEMP_STORE
+
+; Load current stack pointer into X,Y
+RMY SP_HIGH         ; Y = SP high byte
+RMX SP_LOW          ; X = SP low byte
+
+; Check for stack overflow (compare with stack bottom)
+LDA STACK_END_HIGH
+EAY                 ; Compare high bytes
+JMZ PUSH_CHECK_LOW  ; If equal, check low byte
+SAY                 ; A = STACK_END_HIGH - SP_HIGH
+JMN STACK_OVERFLOW_ERROR ; If negative, we hit bottom
+
+:PUSH_CHECK_LOW
+LDA STACK_END_LOW
+EAX                 ; Compare low bytes  
+JMZ STACK_OVERFLOW_ERROR ; If equal, we hit bottom
+SAX                 ; A = STACK_END_LOW - SP_LOW
+JMN STACK_OVERFLOW_ERROR ; If negative, we hit bottom
+
+:PUSH_OK
+; Write value to current stack location
+RMA TEMP_STORE      ; Restore A value
+WMI                 ; Write A to memory[Y*256 + X]
+
+; Decrement stack pointer
+DEX                 ; Decrement low byte
+JNN UPDATE_SP_PUSH  ; If no underflow, update SP
+; X underflowed, decrement high byte
+DEY
+LDX 255             ; X = $FF
+
+:UPDATE_SP_PUSH
+; Store updated stack pointer
+CXA                 ; A = X (low byte)
+WMA SP_LOW
+CYA                 ; A = Y (high byte)
+WMA SP_HIGH
+JMP STACK_RETURN
+
+; Pop value from stack into A register
+; Modifies: A register, stack pointer
+; Sets system flags on underflow
+:STACK_POP_A
+; Load current stack pointer
+RMA SP_HIGH
+CAY                 ; Y = SP high byte
+RMA SP_LOW
+CAX                 ; X = SP low byte
+
+; Increment stack pointer first (since stack grows down)
+INX                 ; Increment low byte
+JNO UPDATE_SP_POP   ; If no overflow, continue
+; X overflowed, increment high byte
+INY
+LDX 0               ; X = 0
+
+:UPDATE_SP_POP
+; Check for stack underflow (compare with stack top)
+LDA STACK_START_HIGH
+EAY                 ; Compare high bytes
+JMZ POP_CHECK_LOW   ; If equal, check low byte
+SAY                 ; A = STACK_START_HIGH - SP_HIGH
+JMN STACK_UNDERFLOW_OK ; If negative, still have data
+JMP STACK_UNDERFLOW_ERROR ; Positive means underflow
+
+:POP_CHECK_LOW
+LDA STACK_START_LOW
+EAX                 ; Compare low bytes
+JMZ STACK_UNDERFLOW_ERROR ; If equal, underflow
+SAX                 ; A = STACK_START_LOW - SP_LOW  
+JMN STACK_UNDERFLOW_OK    ; If negative, still have data
+JMP STACK_UNDERFLOW_ERROR ; Otherwise underflow
+
+:STACK_UNDERFLOW_OK
+; Store updated stack pointer
+CXA                 ; A = X (low byte)
+WMA SP_LOW
+CYA                 ; A = Y (high byte)
+WMA SP_HIGH
+
+; Read value from stack
+RMI                 ; A = memory[Y*256 + X]
+JMP STACK_RETURN
+
+:STACK_UNDERFLOW_ERROR
+; Set underflow flag
+RMA SYSTEM_FLAGS
+LDA FLAG_STACK_UNDERFLOW
+OAX                 ; OR with existing flags
+WMA SYSTEM_FLAGS
+LDA 2
+WMA EXIT_CODE
+JMP STACK_RETURN
+
+;==============================================================================
+; FRAME MANAGEMENT
+;==============================================================================
+
+; Create new stack frame
+; Pushes current frame pointer, sets new frame pointer to current stack pointer
+:FRAME_CREATE
+; Push current frame pointer onto stack (high byte first)
+RMA FP_HIGH
+WMA TEMP_STORE
+JMP STACK_PUSH_A_INTERNAL1
+
+; Push low byte
+RMA FP_LOW  
+WMA TEMP_STORE
+JMP STACK_PUSH_A_INTERNAL2
+
+; Set frame pointer to current stack pointer
+RMA SP_HIGH
+WMA FP_HIGH
+RMA SP_LOW
+WMA FP_LOW
+JMP STACK_RETURN
+
+; Internal push routines for frame management
+:STACK_PUSH_A_INTERNAL1
+RMA TEMP_STORE
+CAY
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+DEX
+JNN UPDATE_SP_PUSH_INT1
+DEY
+LDX 255
+
+:UPDATE_SP_PUSH_INT1
+RMA TEMP_STORE
+WMI
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+; Push low byte next
+RMA FP_LOW
+WMA TEMP_STORE
+JMP STACK_PUSH_A_INTERNAL2
+
+:STACK_PUSH_A_INTERNAL2  
+RMA TEMP_STORE
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+DEX
+JNN UPDATE_SP_PUSH_INT2
+DEY
+LDX 255
+
+:UPDATE_SP_PUSH_INT2
+RMA TEMP_STORE
+WMI
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+JMP FRAME_CREATE_DONE
+
+:FRAME_CREATE_DONE
+RMA SP_HIGH
+WMA FP_HIGH
+RMA SP_LOW
+WMA FP_LOW
+JMP STACK_RETURN
+
+; Destroy current stack frame
+; Restores stack pointer to frame pointer, pops previous frame pointer
+:FRAME_DESTROY
+; Restore stack pointer to frame pointer
+RMA FP_HIGH
+WMA SP_HIGH
+RMA FP_LOW
+WMA SP_LOW
+
+; Pop previous frame pointer (low byte first since we pushed high byte first)
+JMP STACK_POP_A_INTERNAL1
+
+:STACK_POP_A_INTERNAL1
+; Get current SP
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+; Increment SP
+INX
+JNO POP_INT1_CONTINUE
+INY
+LDX 0
+
+:POP_INT1_CONTINUE
+; Update SP
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+; Read low byte of previous FP
+RMI
+WMA FP_LOW
+; Pop high byte
+JMP STACK_POP_A_INTERNAL2
+
+:STACK_POP_A_INTERNAL2
+; Get current SP  
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+; Increment SP
+INX
+JNO POP_INT2_CONTINUE
+INY
+LDX 0
+
+:POP_INT2_CONTINUE
+; Update SP
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+; Read high byte of previous FP
+RMI
+WMA FP_HIGH
+JMP STACK_RETURN
+
+;==============================================================================
+; FUNCTION CALL SUPPORT
+;==============================================================================
+
+; Call a function at address stored in $EE92-$EE93
+; Pushes return address (current PC + 3) onto stack
+; Caller must set target address in $EE92-$EE93 before calling
+:CALL_FUNCTION
+; Calculate return address (PC + 3 for this instruction)
+; This is tricky since we can't directly get PC
+; Caller must manually calculate and store return address in $EE94-$EE95
+
+; Push return address high byte
+RMA $EE94
+WMA TEMP_STORE
+JMP CALL_PUSH_HIGH
+
+:CALL_PUSH_HIGH
+RMA TEMP_STORE
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+DEX
+JNN CALL_UPDATE_SP1
+DEY
+LDX 255
+
+:CALL_UPDATE_SP1
+RMA TEMP_STORE
+WMI
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+
+; Push return address low byte  
+RMA $EE95
+WMA TEMP_STORE
+JMP CALL_PUSH_LOW
+
+:CALL_PUSH_LOW
+RMA TEMP_STORE
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+DEX
+JNN CALL_UPDATE_SP2
+DEY
+LDX 255
+
+:CALL_UPDATE_SP2
+RMA TEMP_STORE
+WMI
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+
+; Jump to function address
+; Since we don't have indirect jump, this is handled by caller
+JMP STACK_RETURN
+
+; Return from function
+; Pops return address from stack and jumps to it
+:RETURN_FUNCTION
+; Pop return address low byte
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+INX
+JNO RET_UPDATE_SP1
+INY
+LDX 0
+
+:RET_UPDATE_SP1
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+RMI
+WMA $EE95
+
+; Pop return address high byte
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+INX
+JNO RET_UPDATE_SP2
+INY
+LDX 0
+
+:RET_UPDATE_SP2
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+RMI
+WMA $EE94
+
+; Jump to return address (handled by caller using $EE94-$EE95)
+JMP STACK_RETURN
+
+;==============================================================================
+; LOCAL VARIABLE SUPPORT
+;==============================================================================
+
+; Allocate space for local variables
+; A register contains number of bytes to allocate
+; Decrements stack pointer by A bytes
+:LOCALS_ALLOC
+; Save allocation size
+WMA TEMP_STORE
+
+; Get current stack pointer
+RMA SP_HIGH
+CAY
+RMA SP_LOW
+CAX
+
+; Subtract allocation size from stack pointer
+RMA TEMP_STORE
+; Simple subtraction - just decrement X by A
+:ALLOC_LOOP
+LDX 0               ; Load 0 into X for comparison
+EAX                 ; Compare A with X (0)
+JMZ ALLOC_DONE      ; If A is zero, we're done
+; Decrement stack pointer (X,Y)
+DEX                 ; Decrement X
+JNN ALLOC_CONTINUE  ; If no underflow, continue
+; X underflowed, decrement Y
+DEY
+LDX 255
+
+:ALLOC_CONTINUE
+DEA                 ; Decrement allocation counter
+JMP ALLOC_LOOP
+
+:ALLOC_DONE
+; Check for stack overflow
+LDA STACK_END_HIGH
+EAY                 ; Compare high bytes
+JMZ ALLOC_CHECK_LOW
+SAY                 ; A = STACK_END_HIGH - Y
+JMN LOCALS_OVERFLOW_ERROR
+
+:ALLOC_CHECK_LOW
+LDA STACK_END_LOW
+EAX                 ; Compare low bytes
+JMZ LOCALS_OVERFLOW_ERROR
+SAX                 ; A = STACK_END_LOW - X
+JMN LOCALS_OVERFLOW_ERROR
+
+:ALLOC_OK
+; Store updated stack pointer
+CXA
+WMA SP_LOW
+CYA
+WMA SP_HIGH
+JMP STACK_RETURN
+
+:LOCALS_OVERFLOW_ERROR
+; Set overflow flag
+RMA SYSTEM_FLAGS
+LDA FLAG_STACK_OVERFLOW
+OAX
+WMA SYSTEM_FLAGS
+LDA 3
+WMA EXIT_CODE
+JMP STACK_RETURN
+
+; Access local variable at offset A from frame pointer
+; Returns value in A register
+:LOCAL_VAR_GET
+; Save offset
+WMA TEMP_STORE
+
+; Get frame pointer
+RMA FP_HIGH
+CAY
+RMA FP_LOW
+CAX
+
+; Add offset to frame pointer
+RMA TEMP_STORE
+AAX                 ; X = X + offset
+JNO LOCAL_GET_READ  ; If no overflow, read
+; Handle carry
+INY
+
+:LOCAL_GET_READ
+; Read value at frame + offset
+RMI                 ; A = memory[Y*256 + X]
+JMP STACK_RETURN
+
+; Set local variable at offset X from frame pointer to value A
+; A = value, X = offset
+:LOCAL_VAR_SET
+; Save value
+WMA TEMP_STORE
+
+; Get frame pointer  
+RMA FP_HIGH
+CAY
+RMA FP_LOW
+; X already contains offset, add it to frame pointer low byte
+AAX                 ; A = FP_LOW + offset
+CAX                 ; X = result
+JNO LOCAL_SET_WRITE
+; Handle carry
+INY
+
+:LOCAL_SET_WRITE
+; Write value at frame + offset
+RMA TEMP_STORE      ; Restore value
+WMI                 ; memory[Y*256 + X] = A
+JMP STACK_RETURN
+
+;==============================================================================
+; UTILITY FUNCTIONS
+;==============================================================================
+
+; Get current stack depth (number of bytes used)
+; Returns depth in A register
+:STACK_DEPTH
+; Calculate: STACK_START - SP
+RMA STACK_START_HIGH
+WMA $EE96           ; Temp storage for calculation
+RMA SP_HIGH
+WMA $EE97
+
+RMA STACK_START_LOW
+WMA $EE98
+RMA SP_LOW
+WMA $EE99
+
+; Subtract low bytes
+RMA $EE98           ; STACK_START_LOW
+RMX $EE99           ; SP_LOW into X register
+SAX                 ; A = STACK_START_LOW - SP_LOW
+WMA $EE98           ; Store result
+
+; Subtract high bytes with borrow
+RMA $EE96           ; STACK_START_HIGH
+RMX $EE97           ; SP_HIGH into X register
+SAX                 ; A = STACK_START_HIGH - SP_HIGH
+; Note: This gives us depth in A (high) and $EE98 (low)
+; For simplicity, just return low byte
+RMA $EE98
+JMP STACK_RETURN
+
+; Check if stack is empty
+; Sets Z flag if empty
+:STACK_IS_EMPTY
+; Compare SP with STACK_START
+RMA SP_HIGH
+LDX STACK_START_HIGH
+EAX                 ; Compare high bytes
+JNZ STACK_RETURN    ; Not equal, not empty
+
+RMA SP_LOW  
+LDX STACK_START_LOW
+EAX                 ; Compare low bytes (sets Z flag)
+JMP STACK_RETURN
+
+; Clear stack (reset to initial state)
+:STACK_CLEAR
+; Reset stack pointer to start
+LDA STACK_START_HIGH
+WMA SP_HIGH
+LDA STACK_START_LOW
+WMA SP_LOW
+
+; Reset frame pointer to start
+WMA FP_HIGH
+LDA STACK_START_LOW
+WMA FP_LOW
+
+; Clear flags
+LDA 0
+WMA SYSTEM_FLAGS
+JMP STACK_RETURN
+
+;==============================================================================
+; ERROR HANDLERS
+;==============================================================================
+
+:STACK_OVERFLOW_ERROR
+; Set overflow flag and exit code
+RMA SYSTEM_FLAGS
+LDA FLAG_STACK_OVERFLOW
+OAX
+WMA SYSTEM_FLAGS
+LDA 1
+WMA EXIT_CODE
+JMP STACK_ERROR_HANDLER
+
+:STACK_ERROR_HANDLER
+; Store error information
+RMA SYSTEM_FLAGS
+WMA $EEF0           ; Store error flags
+RMA EXIT_CODE
+WMA $EEF1           ; Store exit code
+HLT                 ; Halt on error
+
+;==============================================================================
+; COMMON RETURN POINT
+;==============================================================================
+
+:STACK_RETURN
+; All stack functions return here
+; In actual use, calling code continues from here
+NOP
+
+;==============================================================================
+; USER PROGRAM ENTRY POINT
+;==============================================================================
+
+; Programs that import this stack implementation should define __MAIN
+; The stack system will jump here after initialization
+:__MAIN
+; User program starts here
+; Example usage:
+
+; Test the stack
+LDA 42
+JMP STACK_PUSH_A
+LDA 100  
+JMP STACK_PUSH_A
+LDA 255
+JMP STACK_PUSH_A
+
+; Pop values back
+JMP STACK_POP_A     ; Should get 255
+WMA $1000           ; Store for verification
+
+JMP STACK_POP_A     ; Should get 100  
+WMA $1001
+
+JMP STACK_POP_A     ; Should get 42
+WMA $1002
+
+; Test frame management
+JMP FRAME_CREATE
+LDA 10              ; Allocate 10 bytes
+JMP LOCALS_ALLOC
+
+; Set a local variable (offset 5, value 123)
+LDA 123
+LDX 5
+JMP LOCAL_VAR_SET
+
+; Get the local variable back
+LDA 5
+JMP LOCAL_VAR_GET   ; Should return 123
+WMA $1003
+
+; Destroy frame
+JMP FRAME_DESTROY
+
+; Check if stack is empty
+JMP STACK_IS_EMPTY
+CAZ 1               ; Load 1 if empty (Z set)
+NAZ 0               ; Load 0 if not empty  
+WMA $1004
+
+; Get stack depth
+JMP STACK_DEPTH
+WMA $1005
+
+; Program complete
+LDA 0
+WMA EXIT_CODE
+HLT
