@@ -1,5 +1,5 @@
-; CPU Standard Library - Memory Functions with Dynamic Call/Return
-; memset, memcpy, memcmp with automatic return address calculation
+; CPU Standard Library - Memory Functions with Stack-based Call/Return
+; memset, memcpy, memcmp with software call/return mechanism
 
 ; Memory layout
 CONST SP_LOW $EE00
@@ -7,14 +7,617 @@ CONST SP_HIGH $EE01
 CONST TEMP_A $EE10
 CONST TEMP_X $EE11
 CONST TEMP_Y $EE12
-CONST RET_ADDR_LOW $EE13
-CONST RET_ADDR_HIGH $EE14
 CONST TEMP_PTR_LOW $EE15
 CONST TEMP_PTR_HIGH $EE16
+CONST RET_ADDR_LOW $EE13
+CONST RET_ADDR_HIGH $EE14
 
 ; Stack bounds  
 CONST STACK_TOP_HIGH $ED
 CONST STACK_TOP_LOW $FF
+; CPU Standard Library - Comprehensive Macro Set
+; Macros for stack operations, function calls, memory management, and common patterns
+
+;==============================================================================
+; BASIC STACK MACROS
+;==============================================================================
+
+; Push a value onto the stack
+MACRO PUSH value
+    LDA value
+    JMP PUSH_A
+ENDMACRO
+
+; Pop value from stack (result in A)
+MACRO POP
+    JMP POP_A
+ENDMACRO
+
+; Push multiple values (up to 4 parameters)
+MACRO PUSH2 val1 val2
+    PUSH val1
+    PUSH val2
+ENDMACRO
+
+MACRO PUSH3 val1 val2 val3
+    PUSH val1
+    PUSH val2
+    PUSH val3
+ENDMACRO
+
+MACRO PUSH4 val1 val2 val3 val4
+    PUSH val1
+    PUSH val2
+    PUSH val3
+    PUSH val4
+ENDMACRO
+
+; Push a 16-bit address (high byte first, then low byte)
+MACRO PUSH_ADDR addr
+    LDA addr >> 8
+    JMP PUSH_A
+    LDA addr & 255
+    JMP PUSH_A
+ENDMACRO
+
+; Push register contents
+MACRO PUSH_A
+    JMP PUSH_A
+ENDMACRO
+
+MACRO PUSH_X
+    CXA
+    JMP PUSH_A
+ENDMACRO
+
+MACRO PUSH_Y
+    CYA
+    JMP PUSH_A
+ENDMACRO
+
+; Pop into registers
+MACRO POP_X
+    JMP POP_A
+    CAX
+ENDMACRO
+
+MACRO POP_Y
+    JMP POP_A
+    CAY
+ENDMACRO
+
+;==============================================================================
+; FUNCTION CALL MACROS
+;==============================================================================
+
+; Generic function call with automatic return
+MACRO CALL function_name
+    WPC RET_ADDR_LOW
+    JMP function_name
+ENDMACRO
+
+; Function call with single parameter
+MACRO CALL1 function_name param1
+    PUSH param1
+    CALL function_name
+ENDMACRO
+
+; Function call with multiple parameters
+MACRO CALL2 function_name param1 param2
+    PUSH param1
+    PUSH param2
+    CALL function_name
+ENDMACRO
+
+MACRO CALL3 function_name param1 param2 param3
+    PUSH param1
+    PUSH param2
+    PUSH param3
+    CALL function_name
+ENDMACRO
+
+MACRO CALL4 function_name param1 param2 param3 param4
+    PUSH param1
+    PUSH param2
+    PUSH param3
+    PUSH param4
+    CALL function_name
+ENDMACRO
+
+MACRO CALL5 function_name param1 param2 param3 param4 param5
+    PUSH param1
+    PUSH param2
+    PUSH param3
+    PUSH param4
+    PUSH param5
+    CALL function_name
+ENDMACRO
+
+;==============================================================================
+; MEMORY FUNCTION MACROS
+;==============================================================================
+
+; memset(address, value, count)
+MACRO MEMSET_CALL addr value count
+    PUSH count
+    PUSH value
+    LDA addr >> 8
+    JMP PUSH_A
+    LDA addr & 255
+    JMP PUSH_A
+    CALL MEMSET
+ENDMACRO
+
+; memcpy(dest, src, count)
+MACRO MEMCPY_CALL dest src count
+    PUSH count
+    LDA src >> 8
+    JMP PUSH_A
+    LDA src & 255
+    JMP PUSH_A
+    LDA dest >> 8
+    JMP PUSH_A
+    LDA dest & 255
+    JMP PUSH_A
+    CALL MEMCPY
+ENDMACRO
+
+; memcmp(ptr1, ptr2, count)
+MACRO MEMCMP_CALL ptr1 ptr2 count
+    PUSH count
+    LDA ptr2 >> 8
+    JMP PUSH_A
+    LDA ptr2 & 255
+    JMP PUSH_A
+    LDA ptr1 >> 8
+    JMP PUSH_A
+    LDA ptr1 & 255
+    JMP PUSH_A
+    CALL MEMCMP
+ENDMACRO
+
+;==============================================================================
+; REGISTER MANAGEMENT MACROS
+;==============================================================================
+
+; Save all registers to memory
+MACRO SAVE_REGS
+    WMA TEMP_A
+    WMX TEMP_X
+    WMY TEMP_Y
+ENDMACRO
+
+; Restore all registers from memory
+MACRO RESTORE_REGS
+    RMA TEMP_A
+    RMX TEMP_X
+    RMY TEMP_Y
+ENDMACRO
+
+; Save registers to stack
+MACRO SAVE_REGS_STACK
+    PUSH_A
+    PUSH_X
+    PUSH_Y
+ENDMACRO
+
+; Restore registers from stack
+MACRO RESTORE_REGS_STACK
+    POP_Y
+    POP_X
+    POP
+ENDMACRO
+
+; Swap register contents
+MACRO SWAP_AX
+    WMA TEMP_A
+    CAX
+    RMX TEMP_A
+    CAX
+ENDMACRO
+
+MACRO SWAP_AY
+    WMA TEMP_A
+    CAY
+    RMY TEMP_A
+    CAY
+ENDMACRO
+
+MACRO SWAP_XY
+    WMX TEMP_X
+    CXY
+    RMY TEMP_X
+    CYX
+ENDMACRO
+
+;==============================================================================
+; MEMORY ACCESS MACROS
+;==============================================================================
+
+; Load 16-bit value into register pair (Y:X)
+MACRO LOAD16 addr
+    RMA addr
+    CAX
+    RMA addr + 1
+    CAY
+ENDMACRO
+
+; Store register pair (Y:X) to 16-bit address
+MACRO STORE16 addr
+    CXA
+    WMA addr
+    CYA
+    WMA addr + 1
+ENDMACRO
+
+; Load immediate 16-bit value into Y:X
+MACRO LOAD16_IMM value
+    LDX value & 255
+    LDY value >> 8
+ENDMACRO
+
+; Copy memory byte
+MACRO COPY_BYTE src dest
+    RMA src
+    WMA dest
+ENDMACRO
+
+; Set memory to immediate value
+MACRO SET_BYTE addr value
+    LDA value
+    WMA addr
+ENDMACRO
+
+; Clear memory location
+MACRO CLEAR addr
+    LDA 0
+    WMA addr
+ENDMACRO
+
+; Clear multiple memory locations
+MACRO CLEAR2 addr1 addr2
+    LDA 0
+    WMA addr1
+    WMA addr2
+ENDMACRO
+
+MACRO CLEAR3 addr1 addr2 addr3
+    LDA 0
+    WMA addr1
+    WMA addr2
+    WMA addr3
+ENDMACRO
+
+;==============================================================================
+; CONTROL FLOW MACROS
+;==============================================================================
+
+; Conditional jumps with readable names
+MACRO IF_ZERO label
+    JMZ label
+ENDMACRO
+
+MACRO IF_NOT_ZERO label
+    JNZ label
+ENDMACRO
+
+MACRO IF_NEGATIVE label
+    JMN label
+ENDMACRO
+
+MACRO IF_NOT_NEGATIVE label
+    JNN label
+ENDMACRO
+
+MACRO IF_OVERFLOW label
+    JMO label
+ENDMACRO
+
+MACRO IF_NO_OVERFLOW label
+    JNO label
+ENDMACRO
+
+; Compare and branch macros
+MACRO COMPARE_AND_BRANCH reg value label
+    LDX value
+    EAX
+    JMZ label
+ENDMACRO
+
+; Loop counter macros
+MACRO FOR_COUNT count label_start label_end
+    LDA count
+:label_start
+    LDX 0
+    EAX
+    JMZ label_end
+    DEA
+ENDMACRO
+
+; While loop pattern
+MACRO WHILE_NOT_ZERO label_start label_end
+:label_start
+    LDX 0
+    EAX
+    JMZ label_end
+ENDMACRO
+
+;==============================================================================
+; ARITHMETIC MACROS
+;==============================================================================
+
+; Add immediate value to register
+MACRO ADD_IMM reg value
+    LDX value
+    A reg X
+ENDMACRO
+
+; Subtract immediate value from register
+MACRO SUB_IMM reg value
+    LDX value
+    S reg X
+ENDMACRO
+
+; Multiply by 2 (bit shift left)
+MACRO MUL2_A
+    BLA
+ENDMACRO
+
+MACRO MUL2_X
+    BLX
+ENDMACRO
+
+MACRO MUL2_Y
+    BLY
+ENDMACRO
+
+; Divide by 2 (bit shift right)
+MACRO DIV2_A
+    BRA
+ENDMACRO
+
+MACRO DIV2_X
+    BRX
+ENDMACRO
+
+MACRO DIV2_Y
+    BRY
+ENDMACRO
+
+; Increment/Decrement with bounds checking
+MACRO INC_WITH_MAX reg max_val overflow_label
+    IN reg
+    LDX max_val
+    EAX
+    JMZ overflow_label
+ENDMACRO
+
+MACRO DEC_WITH_MIN reg min_val underflow_label
+    DE reg
+    LDX min_val
+    EAX
+    JMZ underflow_label
+ENDMACRO
+
+;==============================================================================
+; DATA MANIPULATION MACROS
+;==============================================================================
+
+; Set flags based on register value
+MACRO TEST_A
+    LDX 0
+    EAX
+ENDMACRO
+
+MACRO TEST_X
+    LDA 0
+    EAX
+ENDMACRO
+
+MACRO TEST_Y
+    LDA 0
+    EAY
+ENDMACRO
+
+; Load register with condition
+MACRO LOAD_IF_ZERO reg value
+    CAZ value
+ENDMACRO
+
+MACRO LOAD_IF_NOT_ZERO reg value
+    NAZ value
+ENDMACRO
+
+; Bitwise operations with immediate values
+MACRO AND_IMM value
+    LDX value
+    NAX
+ENDMACRO
+
+MACRO OR_IMM value
+    LDX value
+    OAX
+ENDMACRO
+
+MACRO XOR_IMM value
+    LDX value
+    XAX
+ENDMACRO
+
+;==============================================================================
+; STRING/BUFFER MACROS
+;==============================================================================
+
+; Clear buffer with specific size
+MACRO CLEAR_BUFFER addr size
+    MEMSET_CALL addr 0 size
+ENDMACRO
+
+; Copy buffer
+MACRO COPY_BUFFER src dest size
+    MEMCPY_CALL dest src size
+ENDMACRO
+
+; Fill buffer with pattern
+MACRO FILL_BUFFER addr pattern size
+    MEMSET_CALL addr pattern size
+ENDMACRO
+
+; Compare buffers
+MACRO COMPARE_BUFFERS buf1 buf2 size
+    MEMCMP_CALL buf1 buf2 size
+ENDMACRO
+
+;==============================================================================
+; DEBUGGING MACROS
+;==============================================================================
+
+; Store register values for debugging
+MACRO DEBUG_SAVE_REGS addr
+    WMA addr
+    WMX addr + 1
+    WMY addr + 2
+ENDMACRO
+
+; Breakpoint simulation
+MACRO BREAKPOINT
+    NOP
+    NOP
+    NOP
+ENDMACRO
+
+; Assert macro (halt if condition is false)
+MACRO ASSERT condition_check halt_label
+    condition_check
+    JMZ halt_label
+ENDMACRO
+
+;==============================================================================
+; HIGH-LEVEL PATTERNS
+;==============================================================================
+
+; Function prologue/epilogue
+MACRO FUNCTION_ENTER
+    SAVE_REGS
+ENDMACRO
+
+MACRO FUNCTION_EXIT
+    RESTORE_REGS
+    JMP RETURN
+ENDMACRO
+
+; Error handling pattern
+MACRO ON_ERROR error_code cleanup_label
+    LDA error_code
+    LDX 0
+    EAX
+    JNZ cleanup_label
+ENDMACRO
+
+; Retry loop pattern
+MACRO RETRY_LOOP max_attempts loop_start exit_label
+    LDA max_attempts
+:loop_start
+    LDX 0
+    EAX
+    JMZ exit_label
+    DEA
+ENDMACRO
+
+;==============================================================================
+; UTILITY MACROS
+;==============================================================================
+
+; No-operation delay
+MACRO DELAY count
+    LDA count
+:DELAY_LOOP
+    DEA
+    JNZ DELAY_LOOP
+ENDMACRO
+
+; Toggle bit in memory
+MACRO TOGGLE_BIT addr bit_mask
+    RMA addr
+    LDX bit_mask
+    XAX
+    WMA addr
+ENDMACRO
+
+; Set bit in memory
+MACRO SET_BIT addr bit_mask
+    RMA addr
+    LDX bit_mask
+    OAX
+    WMA addr
+ENDMACRO
+
+; Clear bit in memory
+MACRO CLEAR_BIT addr bit_mask
+    RMA addr
+    LDX bit_mask
+    XOR_IMM 255
+    NAX
+    WMA addr
+ENDMACRO
+
+; Check if bit is set
+MACRO TEST_BIT addr bit_mask result_label
+    RMA addr
+    LDX bit_mask
+    NAX
+    JNZ result_label
+ENDMACRO
+
+;==============================================================================
+; ARRAY/TABLE MACROS
+;==============================================================================
+
+; Access array element: array_base + index * element_size
+MACRO ARRAY_ACCESS base_addr index element_size
+    LDA index
+    LDX element_size
+    ; Simple multiplication by repeated addition (for small sizes)
+    ; For element_size = 1, just use index directly
+ENDMACRO
+
+; Bounds-checked array access
+MACRO SAFE_ARRAY_ACCESS base_addr index max_index error_label
+    LDA index
+    LDX max_index
+    SAX
+    JMN error_label
+    ; Continue with array access
+ENDMACRO
+
+;==============================================================================
+; EXAMPLE USAGE PATTERNS
+;==============================================================================
+
+; Example: Clear a 256-byte buffer
+; CLEAR_BUFFER $4000 256
+
+; Example: Function with error handling
+; FUNCTION_ENTER
+; ; ... function body ...
+; ON_ERROR 1 ERROR_CLEANUP
+; FUNCTION_EXIT
+; :ERROR_CLEANUP
+; LDA 1
+; FUNCTION_EXIT
+
+; Example: Loop with counter
+; FOR_COUNT 10 LOOP_START LOOP_END
+; ; ... loop body ...
+; JMP LOOP_START
+; :LOOP_END
+
+; Example: Compare two memory regions
+; COMPARE_BUFFERS $2000 $3000 100
+; IF_ZERO BUFFERS_EQUAL
+; ; Handle different buffers
+; :BUFFERS_EQUAL
+; ; Handle identical buffers
 
 ;==============================================================================
 ; INITIALIZATION
@@ -29,11 +632,67 @@ CONST STACK_TOP_LOW $FF
     JMP USER_MAIN
 
 ;==============================================================================
-; STACK OPERATIONS
+; LOW-LEVEL STACK OPERATIONS (Internal use only - no call/return)
 ;==============================================================================
 
-:PUSH
-    ; Push A register onto stack
+:PUSH_A_INTERNAL
+    ; Internal push - saves A to stack, returns by falling through
+    WMA TEMP_A
+    
+    ; Get current SP
+    RMA SP_HIGH
+    CAY
+    RMA SP_LOW
+    CAX
+    
+    ; Write value to stack
+    RMA TEMP_A
+    WMI
+    
+    ; Decrement SP
+    DEX
+    JNN PUSH_INTERNAL_UPDATE_SP
+    DEY
+    LDX $FF
+    
+:PUSH_INTERNAL_UPDATE_SP
+    CXA
+    WMA SP_LOW
+    CYA
+    WMA SP_HIGH
+    ; Fall through to caller
+
+:POP_A_INTERNAL
+    ; Internal pop - loads A from stack, returns by falling through
+    ; Get current SP
+    RMA SP_HIGH
+    CAY
+    RMA SP_LOW
+    CAX
+    
+    ; Increment SP first
+    INX
+    JNO POP_INTERNAL_READ
+    INY
+    LDX 0
+    
+:POP_INTERNAL_READ
+    ; Update SP
+    CXA
+    WMA SP_LOW
+    CYA
+    WMA SP_HIGH
+    
+    ; Read value
+    RMI
+    ; Fall through to caller
+
+;==============================================================================
+; PUBLIC STACK OPERATIONS (Callable functions)
+;==============================================================================
+
+:PUSH_A
+    ; Public push function - callable with call/return
     WMA TEMP_A
     
     ; Get current SP
@@ -57,10 +716,11 @@ CONST STACK_TOP_LOW $FF
     WMA SP_LOW
     CYA
     WMA SP_HIGH
-    NOP
+    JMP RETURN
 
-:POP
-    ; Pop from stack into A register
+:POP_A
+    ; Public pop function - callable with call/return
+    ; Get current SP
     RMA SP_HIGH
     CAY
     RMA SP_LOW
@@ -73,30 +733,26 @@ CONST STACK_TOP_LOW $FF
     LDX 0
     
 :POP_READ
+    ; Update SP
     CXA
     WMA SP_LOW
     CYA
     WMA SP_HIGH
+    
+    ; Read value
     RMI
-    NOP
+    JMP RETURN
 
 ;==============================================================================
-; DYNAMIC CALL/RETURN SYSTEM
+; CALL/RETURN MECHANISM
 ;==============================================================================
-
-; CALL macro - use this before jumping to functions
-; Usage: 
-;   WPC RET_ADDR_LOW    ; Save current PC
-;   JMP function_name
-; The function will return to the instruction after the JMP
 
 :RETURN
     ; Return to saved address
     RPC RET_ADDR_LOW
-    NOP
 
 ;==============================================================================
-; MEMORY FUNCTIONS - DIRECT CALLABLE
+; MEMORY FUNCTIONS
 ;==============================================================================
 
 :MEMSET
@@ -107,17 +763,17 @@ CONST STACK_TOP_LOW $FF
     WMX TEMP_X
     WMY TEMP_Y
     
-    ; Pop parameters
-    JMP POP             ; addr_low
+    ; Pop parameters using internal functions
+    JMP POP_A_INTERNAL      ; addr_low
     WMA TEMP_A
-    JMP POP             ; addr_high
+    JMP POP_A_INTERNAL      ; addr_high
     CAY
     RMA TEMP_A
-    CAX                 ; Y:X = destination address
+    CAX                     ; Y:X = destination address
     
-    JMP POP             ; value
+    JMP POP_A_INTERNAL      ; value
     WMA TEMP_A
-    JMP POP             ; count
+    JMP POP_A_INTERNAL      ; count
     
 :MEMSET_LOOP
     ; Check if count is zero
@@ -154,19 +810,19 @@ CONST STACK_TOP_LOW $FF
     WMX TEMP_X
     WMY TEMP_Y
     
-    ; Pop dest address
-    JMP POP
+    ; Pop dest address using internal functions
+    JMP POP_A_INTERNAL
     WMA TEMP_PTR_LOW
-    JMP POP
+    JMP POP_A_INTERNAL
     WMA TEMP_PTR_HIGH
     
     ; Pop src address into Y:X
-    JMP POP
+    JMP POP_A_INTERNAL
     CAX
-    JMP POP
+    JMP POP_A_INTERNAL
     CAY
     
-    JMP POP             ; count
+    JMP POP_A_INTERNAL      ; count
     
 :MEMCPY_LOOP
     ; Check count
@@ -225,19 +881,19 @@ CONST STACK_TOP_LOW $FF
     WMX TEMP_X
     WMY TEMP_Y
     
-    ; Pop ptr1 into Y:X
-    JMP POP
+    ; Pop ptr1 into Y:X using internal functions
+    JMP POP_A_INTERNAL
     CAX
-    JMP POP
+    JMP POP_A_INTERNAL
     CAY
     
     ; Pop ptr2 into temps
-    JMP POP
+    JMP POP_A_INTERNAL
     WMA TEMP_PTR_LOW
-    JMP POP
+    JMP POP_A_INTERNAL
     WMA TEMP_PTR_HIGH
     
-    JMP POP             ; count
+    JMP POP_A_INTERNAL      ; count
     
 :MEMCMP_LOOP
     ; Check count
@@ -273,7 +929,7 @@ CONST STACK_TOP_LOW $FF
     WMA TEMP_PTR_HIGH
     
     ; Increment ptr1 (restore Y:X)
-    RMA TEMP_A          ; Get original ptr1 values
+    RMA TEMP_A
     CAY
     RMA TEMP_X
     CAX
@@ -311,123 +967,65 @@ CONST STACK_TOP_LOW $FF
     JMP RETURN
 
 ;==============================================================================
-; SIMPLIFIED CALLING MACROS (use these in your code)
-;==============================================================================
-
-; Call memset(addr, value, count)
-:CALL_MEMSET_INLINE
-    ; Push parameters first
-    LDA 5               ; count
-    JMP PUSH
-    LDA 42              ; value
-    JMP PUSH
-    LDA $20             ; addr_high
-    JMP PUSH
-    LDA $00             ; addr_low
-    JMP PUSH
-    
-    ; Save return address and call
-    WPC RET_ADDR_LOW
-    JMP MEMSET
-    
-    ; Execution continues here
-    NOP
-
-; Call memcpy(dest, src, count)  
-:CALL_MEMCPY_INLINE
-    LDA 3               ; count
-    JMP PUSH
-    LDA $20             ; src_high
-    JMP PUSH
-    LDA $00             ; src_low
-    JMP PUSH
-    LDA $21             ; dest_high
-    JMP PUSH
-    LDA $00             ; dest_low
-    JMP PUSH
-    
-    WPC RET_ADDR_LOW
-    JMP MEMCPY
-    NOP
-
-; Call memcmp(ptr1, ptr2, count)
-:CALL_MEMCMP_INLINE
-    LDA 3               ; count
-    JMP PUSH
-    LDA $21             ; ptr2_high
-    JMP PUSH
-    LDA $00             ; ptr2_low
-    JMP PUSH
-    LDA $20             ; ptr1_high
-    JMP PUSH
-    LDA $00             ; ptr1_low
-    JMP PUSH
-    
-    WPC RET_ADDR_LOW
-    JMP MEMCMP
-    NOP
-
-;==============================================================================
 ; USER PROGRAM
 ;==============================================================================
 
 :USER_MAIN
-    ; Test all three functions using the inline call examples
-    JMP CALL_MEMSET_INLINE
-    WMA $3000           ; Store memset result
-    
-    JMP CALL_MEMCPY_INLINE
-    WMA $3001           ; Store memcpy result
-    
-    JMP CALL_MEMCMP_INLINE
-    WMA $3002           ; Store memcmp result (should be 0 = equal)
-    
-    HLT
-
-;==============================================================================
-; ADVANCED USAGE EXAMPLE
-;==============================================================================
-
-:ADVANCED_EXAMPLE
-    ; Clear a 256-byte buffer at $4000
-    LDA 255             ; count (almost full page)
-    JMP PUSH
-    LDA 0               ; value (zero)
-    JMP PUSH
-    LDA $40             ; addr_high
-    JMP PUSH
-    LDA $00             ; addr_low
-    JMP PUSH
+    ; Test memset - fill 5 bytes at $2000 with 42
+    LDA 5
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA 42
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $20
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $00
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
     WPC RET_ADDR_LOW
     JMP MEMSET
+    WMA $3000           ; Store result
     
-    ; Copy some data into it
-    LDA 10              ; count
-    JMP PUSH
-    LDA $20             ; src_high (from our previous test)
-    JMP PUSH
-    LDA $00             ; src_low
-    JMP PUSH
-    LDA $40             ; dest_high
-    JMP PUSH
-    LDA $10             ; dest_low (offset into buffer)
-    JMP PUSH
+    ; Test memcpy - copy 3 bytes from $2000 to $2100
+    LDA 3
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $20
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $00
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $21
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $00
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
     WPC RET_ADDR_LOW
     JMP MEMCPY
+    WMA $3001           ; Store result
     
-    ; Verify it matches
-    LDA 10              ; count
-    JMP PUSH
-    LDA $40             ; ptr2_high
-    JMP PUSH
-    LDA $10             ; ptr2_low
-    JMP PUSH
-    LDA $20             ; ptr1_high
-    JMP PUSH
-    LDA $00             ; ptr1_low
-    JMP PUSH
+    ; Test memcmp - compare $2000 with $2100 (3 bytes)
+    LDA 3
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $21
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $00
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $20
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
+    LDA $00
+    WPC RET_ADDR_LOW
+    JMP PUSH_A
     WPC RET_ADDR_LOW
     JMP MEMCMP
+    WMA $3002           ; Store result (should be 0 = equal)
     
-    ; A now contains comparison result
     HLT
