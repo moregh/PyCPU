@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Assembly Control Flow Analyzer
+Assembly Control Flow Analyzer - Updated Version
 Generates Graphviz DOT files showing control flow between labels in assembly programs
+Compatible with our CPU emulator's instruction set and macro system
 """
 
 import argparse
@@ -14,7 +15,7 @@ class ControlFlowAnalyzer:
     """Analyzes control flow in assembly programs and generates DOT graphs"""
     
     def __init__(self):
-        # Jump instructions that affect control flow
+        # Jump instructions that affect control flow (from our instruction set)
         self.jump_instructions = {
             'JMP': 'unconditional',
             'JNZ': 'conditional', 
@@ -30,15 +31,37 @@ class ControlFlowAnalyzer:
             'JBX': 'relative',
             'JBY': 'relative',
             'JAD': 'indirect',
-            'RPC': 'indirect'
+            'RPC': 'indirect',
+            'CALL': 'call'  # Our macro-generated calls
         }
         
         # Instructions that end execution flow
         self.terminal_instructions = {'HLT'}
         
-        # Instructions that can be function calls (for styling)
-        self.call_instructions = {'WPC', 'JAD'}
+        # Instructions that can be function calls
+        self.call_instructions = {'WPC', 'JAD', 'CALL'}
         
+        # Our CPU's complete instruction set for validation
+        self.cpu_instructions = {
+            'HLT', 'CLR', 'NOP', 'AAX', 'AAY', 'AXY', 'SAX', 'SAY', 'SXY',
+            'INA', 'INX', 'INY', 'DEA', 'DEX', 'DEY', 'NAX', 'NAY', 'NXY',
+            'OAX', 'OAY', 'OXY', 'XAX', 'XAY', 'XXY', 'BLA', 'BLX', 'BLY',
+            'BRA', 'BRX', 'BRY', 'EAX', 'EAY', 'EXY', 'JMP', 'JNZ', 'JMZ',
+            'JNN', 'JMN', 'JNO', 'JMO', 'JFA', 'JFX', 'JFY', 'JBA', 'JBX',
+            'JBY', 'JAD', 'WPC', 'RPC', 'LDA', 'LDX', 'LDY', 'CAX', 'CAY',
+            'CXY', 'CYX', 'CXA', 'CYA', 'CAZ', 'NAZ', 'CAO', 'NAO', 'CAN',
+            'NAN', 'CXZ', 'NXZ', 'CXO', 'NXO', 'CXN', 'NXN', 'CYZ', 'NYZ',
+            'CYO', 'NYO', 'CYN', 'NYN', 'WMA', 'WMX', 'WMY', 'RMA', 'RMX',
+            'RMY', 'RMI', 'WMI', 'RMO', 'WMO', 'FIL', 'CMP', 'CPY'
+        }
+        
+        # Common macro names that might affect control flow
+        self.macro_patterns = {
+            'CALL', 'PUSH', 'POP', 'IF_ZERO', 'IF_NOT_ZERO', 'WHILE_NOT_ZERO',
+            'FOR_COUNT', 'FUNCTION_ENTER', 'FUNCTION_EXIT', 'MEMSET_CALL',
+            'MEMCPY_CALL', 'MEMCMP_CALL'
+        }
+    
     def parse_assembly_file(self, filename: str) -> Tuple[Dict[str, int], List[Tuple[int, str, int]]]:
         """
         Parse assembly file and extract labels and instructions
@@ -57,11 +80,13 @@ class ControlFlowAnalyzer:
         current_address = 0
         
         for line_num, line in enumerate(lines, 1):
+            original_line = line
+            
             # Remove comments and whitespace
             line = line.split(';')[0].strip()
             if not line:
                 continue
-                
+            
             # Check for label definition
             label_match = re.match(r'^:(\w+)', line)
             if label_match:
@@ -69,84 +94,28 @@ class ControlFlowAnalyzer:
                 labels[label_name] = current_address
                 continue
             
-            # Check for constant definitions (don't affect flow)
-            if re.match(r'^\s*(CONST|CONSTANT)\s+', line, re.IGNORECASE):
+            # Check for constant/macro definitions (don't affect control flow)
+            if re.match(r'^\s*(CONST|CONSTANT|MACRO|ENDMACRO)\s+', line, re.IGNORECASE):
+                continue
+            
+            # Parse instruction line
+            parts = line.split()
+            if not parts:
                 continue
                 
-            # This is an instruction line
-            instructions.append((current_address, line, line_num))
-            current_address += 1
+            instruction = parts[0].upper()
             
+            # Check if this is a known instruction or macro
+            if instruction in self.cpu_instructions or instruction in self.macro_patterns:
+                instructions.append((current_address, original_line.strip(), line_num))
+                current_address += 1
+            else:
+                # Could be a macro call or unknown instruction
+                # Treat as potential control flow instruction
+                instructions.append((current_address, original_line.strip(), line_num))
+                current_address += 1
+        
         return labels, instructions
-    
-    def find_label_at_address(self, address: int, labels: Dict[str, int]) -> Optional[str]:
-        """Find label at specific address"""
-        for label, addr in labels.items():
-            if addr == address:
-                return label
-        return None
-    
-    def get_label_for_address(self, address: int, labels: Dict[str, int], 
-                            address_to_label_map: Dict[int, str]) -> str:
-        """Get the controlling label for an address"""
-        if address in address_to_label_map:
-            return address_to_label_map[address]
-        
-        # Find the label that controls this address (the most recent label before this address)
-        controlling_label = None
-        max_label_addr = -1
-        
-        for label, label_addr in labels.items():
-            if label_addr <= address and label_addr > max_label_addr:
-                controlling_label = label
-                max_label_addr = label_addr
-        
-        # If no label found and address is 0, use entry point
-        if controlling_label is None and address == 0:
-            controlling_label = "__entry"
-        elif controlling_label is None:
-            # This is an orphaned instruction - should be rare
-            controlling_label = f"ORPHAN_{address:04X}"
-        
-        return controlling_label
-    
-    def build_address_to_label_map(self, labels: Dict[str, int], 
-                                 instructions: List[Tuple[int, str, int]]) -> Tuple[Dict[int, str], Dict[int, List[str]]]:
-        """Build a map from each instruction address to its controlling label and track all labels at each address"""
-        address_to_label = {}
-        address_to_all_labels = {}  # Track all labels at each address
-        
-        # Add entry point if address 0 doesn't have a label
-        all_labels = dict(labels)
-        if 0 not in all_labels.values():
-            all_labels["__entry"] = 0
-        
-        # Build reverse mapping: address -> list of labels at that address
-        for label, addr in all_labels.items():
-            if addr not in address_to_all_labels:
-                address_to_all_labels[addr] = []
-            address_to_all_labels[addr].append(label)
-        
-        # Sort labels by address
-        sorted_labels = sorted(all_labels.items(), key=lambda x: x[1])
-        
-        # For each instruction, find which label controls it
-        for addr, instruction, line_num in instructions:
-            controlling_label = None
-            
-            # Find the most recent label at or before this address
-            for label, label_addr in reversed(sorted_labels):
-                if label_addr <= addr:
-                    controlling_label = label
-                    break
-            
-            if controlling_label is None:
-                # This shouldn't happen if we have __entry, but just in case
-                controlling_label = f"ORPHAN_{addr:04X}"
-            
-            address_to_label[addr] = controlling_label
-        
-        return address_to_label, address_to_all_labels
     
     def extract_jump_targets(self, instructions: List[Tuple[int, str, int]], 
                            labels: Dict[str, int]) -> Dict[int, List[Tuple[str, str]]]:
@@ -158,20 +127,39 @@ class ControlFlowAnalyzer:
         """
         jumps = {}
         
-        for addr, instruction, line_num in instructions:
+        for addr, instruction_line, line_num in instructions:
             # Parse instruction
-            parts = instruction.split()
+            clean_line = instruction_line.split(';')[0].strip()
+            parts = clean_line.split()
             if not parts:
                 continue
                 
             opcode = parts[0].upper()
+            
+            # Handle macro-generated control flow
+            if opcode == 'CALL' and len(parts) > 1:
+                target = parts[1]
+                if addr not in jumps:
+                    jumps[addr] = []
+                jumps[addr].append((target, 'call'))
+                continue
+            
+            # Handle conditional macros
+            if opcode in ['IF_ZERO', 'IF_NOT_ZERO', 'IF_NEGATIVE', 'IF_NOT_NEGATIVE'] and len(parts) > 1:
+                target = parts[1]
+                if addr not in jumps:
+                    jumps[addr] = []
+                jumps[addr].append((target, 'conditional'))
+                continue
+            
+            # Handle standard jump instructions
             if opcode not in self.jump_instructions:
                 continue
                 
             jump_type = self.jump_instructions[opcode]
             
             # Extract target for direct jumps
-            if jump_type in ['unconditional', 'conditional'] and len(parts) > 1:
+            if jump_type in ['unconditional', 'conditional', 'call'] and len(parts) > 1:
                 target = parts[1]
                 
                 # Handle different target formats
@@ -181,8 +169,7 @@ class ControlFlowAnalyzer:
                         target_addr = int(target[1:], 16)
                         target_label = self.find_label_at_address(target_addr, labels)
                         if not target_label:
-                            # If no label at exact address, this is a jump to unlabeled code
-                            target_label = f"UNLABELED_{target_addr:04X}"
+                            target_label = f"ADDR_{target_addr:04X}"
                     except ValueError:
                         target_label = target
                 elif target.isdigit():
@@ -190,7 +177,7 @@ class ControlFlowAnalyzer:
                     target_addr = int(target)
                     target_label = self.find_label_at_address(target_addr, labels)
                     if not target_label:
-                        target_label = f"UNLABELED_{target_addr:04X}"
+                        target_label = f"ADDR_{target_addr:04X}"
                 else:
                     # Assume it's a label name
                     target_label = target
@@ -200,7 +187,7 @@ class ControlFlowAnalyzer:
                 jumps[addr].append((target_label, jump_type))
             
             elif jump_type == 'relative':
-                # Relative jumps - we can't easily determine target without execution
+                # Relative jumps - target determined at runtime
                 if addr not in jumps:
                     jumps[addr] = []
                 jumps[addr].append(("RELATIVE_TARGET", jump_type))
@@ -213,6 +200,13 @@ class ControlFlowAnalyzer:
         
         return jumps
     
+    def find_label_at_address(self, address: int, labels: Dict[str, int]) -> Optional[str]:
+        """Find label at specific address"""
+        for label, addr in labels.items():
+            if addr == address:
+                return label
+        return None
+    
     def build_control_flow_graph(self, labels: Dict[str, int], 
                                instructions: List[Tuple[int, str, int]]) -> Dict[str, List[Tuple[str, str]]]:
         """
@@ -221,14 +215,24 @@ class ControlFlowAnalyzer:
         Returns:
             Dict mapping source labels to list of (target_label, edge_type) tuples
         """
+        # Build address to instruction mapping
+        addr_to_instruction = {}
+        for addr, instruction_line, line_num in instructions:
+            clean_line = instruction_line.split(';')[0].strip()
+            if clean_line:
+                addr_to_instruction[addr] = clean_line.split()[0].upper()
+        
         # Build address to label mapping
-        address_to_label, address_to_all_labels = self.build_address_to_label_map(labels, instructions)
+        address_to_label = self.build_address_to_label_map(labels, instructions)
         jumps = self.extract_jump_targets(instructions, labels)
         
         # Add entry point if not present
         all_labels = set(labels.keys())
-        if "__entry" in address_to_label.values():
-            all_labels.add("__entry")
+        if "__MAIN" not in all_labels and "USER_MAIN" not in all_labels and "INIT" not in all_labels:
+            if 0 in address_to_label:
+                all_labels.add("__ENTRY")
+                labels["__ENTRY"] = 0
+                address_to_label[0] = "__ENTRY"
         
         graph = {}
         
@@ -236,54 +240,22 @@ class ControlFlowAnalyzer:
         for label in all_labels:
             graph[label] = []
         
-        # Create fall-through edges between consecutive labels at the same address
-        # Sort addresses that have labels
-        labeled_addresses = sorted(address_to_all_labels.keys())
-        for addr in labeled_addresses:
-            labels_at_addr = address_to_all_labels[addr]
-            if len(labels_at_addr) > 1:
-                # For labels at the same address, we need to determine the execution order
-                # The first label defined is the entry point, subsequent labels are fall-through targets
-                # Sort by the original order they appear in the source (use original labels dict order)
-                original_order = []
-                for label in labels.keys():  # This preserves the order from the source file
-                    if label in labels_at_addr:
-                        original_order.append(label)
-                
-                # Add any remaining labels (like __entry) at the end
-                for label in labels_at_addr:
-                    if label not in original_order:
-                        original_order.append(label)
-                
-                # Create fall-through edges: first label flows to second, second to third, etc.
-                for i in range(len(original_order) - 1):
-                    source_label = original_order[i]
-                    target_label = original_order[i + 1]
-                    edge = (target_label, 'fallthrough')
-                    if edge not in graph[source_label]:
-                        graph[source_label].append(edge)
-        
         # Process each instruction to find control flow between labels
-        for addr, instruction, line_num in instructions:
-            opcode = instruction.split()[0].upper() if instruction.split() else ""
-            source_label = address_to_label[addr]
+        for addr, instruction_line, line_num in instructions:
+            clean_line = instruction_line.split(';')[0].strip()
+            if not clean_line:
+                continue
+                
+            opcode = clean_line.split()[0].upper()
+            source_label = address_to_label.get(addr, f"ADDR_{addr:04X}")
             
             # Handle jumps from this instruction
             if addr in jumps:
                 for target_label_or_addr, jump_type in jumps[addr]:
-                    # Resolve target label
-                    if target_label_or_addr.startswith("UNLABELED_"):
-                        # This is a jump to an address without a label - this is broken code
-                        target_addr = int(target_label_or_addr.split("_")[1], 16)
-                        if target_addr in address_to_label:
-                            actual_target = address_to_label[target_addr]
-                        else:
-                            actual_target = target_label_or_addr  # Keep as unlabeled
-                    else:
-                        actual_target = target_label_or_addr
-                    
                     # Add edge if it doesn't already exist
-                    edge = (actual_target, jump_type)
+                    edge = (target_label_or_addr, jump_type)
+                    if source_label not in graph:
+                        graph[source_label] = []
                     if edge not in graph[source_label]:
                         graph[source_label].append(edge)
             
@@ -291,6 +263,7 @@ class ControlFlowAnalyzer:
             next_addr = addr + 1
             if (opcode not in self.terminal_instructions and 
                 opcode != 'JMP' and  # Unconditional jump doesn't fall through
+                not opcode.startswith('CALL') and  # Function calls might not fall through
                 next_addr in address_to_label):
                 
                 next_label = address_to_label[next_addr]
@@ -298,23 +271,55 @@ class ControlFlowAnalyzer:
                 # Only add fall-through edge if we're moving to a different label
                 if next_label != source_label:
                     edge = (next_label, 'fallthrough')
+                    if source_label not in graph:
+                        graph[source_label] = []
                     if edge not in graph[source_label]:
                         graph[source_label].append(edge)
         
-        # Remove empty nodes (labels with no outgoing edges and no incoming edges)
-        # First, find all targets
+        # Remove empty nodes that have no incoming or outgoing edges
         all_targets = set()
         for source_edges in graph.values():
             for target, _ in source_edges:
                 all_targets.add(target)
         
-        # Keep nodes that have outgoing edges or are targets of other nodes
         filtered_graph = {}
         for label, edges in graph.items():
-            if edges or label in all_targets or label == "__entry":
+            if edges or label in all_targets or label in ["__ENTRY", "__MAIN", "USER_MAIN", "INIT"]:
                 filtered_graph[label] = edges
         
         return filtered_graph
+    
+    def build_address_to_label_map(self, labels: Dict[str, int], 
+                                 instructions: List[Tuple[int, str, int]]) -> Dict[int, str]:
+        """Build a map from each instruction address to its controlling label"""
+        address_to_label = {}
+        
+        # Add entry point if address 0 doesn't have a label
+        all_labels = dict(labels)
+        if 0 not in all_labels.values():
+            if any(addr == 0 for addr, _, _ in instructions):
+                all_labels["__ENTRY"] = 0
+        
+        # Sort labels by address
+        sorted_labels = sorted(all_labels.items(), key=lambda x: x[1])
+        
+        # For each instruction, find which label controls it
+        for addr, instruction_line, line_num in instructions:
+            controlling_label = None
+            
+            # Find the most recent label at or before this address
+            for label, label_addr in reversed(sorted_labels):
+                if label_addr <= addr:
+                    controlling_label = label
+                    break
+            
+            if controlling_label is None:
+                # This shouldn't happen if we have __ENTRY, but just in case
+                controlling_label = f"ORPHAN_{addr:04X}"
+            
+            address_to_label[addr] = controlling_label
+        
+        return address_to_label
     
     def generate_dot(self, graph: Dict[str, List[Tuple[str, str]]], 
                     program_name: str = "assembly_program") -> str:
@@ -343,14 +348,16 @@ class ControlFlowAnalyzer:
         
         # Add node definitions with styling
         for node in sorted(all_nodes):
-            if node == "__entry":
-                dot_lines.append(f'    "{node}" [fillcolor=lightgreen, label="Entry Point"];')
-            elif node.startswith("UNLABELED_") or node.startswith("ORPHAN_"):
+            if node in ["__ENTRY", "__MAIN", "USER_MAIN", "INIT"]:
+                dot_lines.append(f'    "{node}" [fillcolor=lightgreen, label="{node}\\n(Entry Point)"];')
+            elif node.startswith("ADDR_") or node.startswith("ORPHAN_"):
                 dot_lines.append(f'    "{node}" [fillcolor=red, label="{node}\\n(Broken Code!)"];')
             elif node in ["RELATIVE_TARGET", "INDIRECT_TARGET"]:
                 dot_lines.append(f'    "{node}" [fillcolor=orange, shape=ellipse];')
+            elif any(mem_func in node for mem_func in ["MEMSET", "MEMCPY", "MEMCMP", "PUSH", "POP"]):
+                dot_lines.append(f'    "{node}" [fillcolor=lightblue, label="{node}\\n(Library)"];')
             else:
-                dot_lines.append(f'    "{node}" [fillcolor=lightblue];')
+                dot_lines.append(f'    "{node}" [fillcolor=lightcyan];')
         
         dot_lines.append('')
         
@@ -359,9 +366,11 @@ class ControlFlowAnalyzer:
         for source in sorted(graph.keys()):
             for target, edge_type in graph[source]:
                 if edge_type == 'unconditional':
-                    dot_lines.append(f'    "{source}" -> "{target}" [color=red, label="JMP"];')
+                    dot_lines.append(f'    "{source}" -> "{target}" [color=red, label="JMP", penwidth=2];')
                 elif edge_type == 'conditional':
                     dot_lines.append(f'    "{source}" -> "{target}" [color=blue, label="conditional"];')
+                elif edge_type == 'call':
+                    dot_lines.append(f'    "{source}" -> "{target}" [color=green, label="CALL", penwidth=2];')
                 elif edge_type == 'fallthrough':
                     dot_lines.append(f'    "{source}" -> "{target}" [color=gray, style=dashed];')
                 elif edge_type == 'relative':
@@ -388,14 +397,14 @@ class ControlFlowAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate control flow graphs for assembly programs",
+        description="Generate control flow graphs for CPU assembly programs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python control_flow.py program.asm
-  python control_flow.py --output flow.dot program.asm
-  python control_flow.py --render program.asm
-  python control_flow.py --format png --output flow.png program.asm
+  python flow_analyzer.py program.asm
+  python flow_analyzer.py --output flow.dot program.asm
+  python flow_analyzer.py --render program.asm
+  python flow_analyzer.py --format png --output flow.png program.asm
 
 Output formats (with --render):
   png, svg, pdf, ps, dot (default: png)
@@ -464,6 +473,7 @@ Output formats (with --render):
             try:
                 import subprocess
                 import tempfile
+                import os
                 
                 # Write DOT content to temporary file
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.dot', delete=False) as temp_dot:
@@ -479,7 +489,6 @@ Output formats (with --render):
                     sys.exit(1)
                 
                 # Clean up temp file
-                import os
                 os.unlink(temp_dot_path)
                 
                 print(f"Control flow graph rendered to: {output_file}")

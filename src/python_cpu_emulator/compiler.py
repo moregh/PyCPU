@@ -23,6 +23,9 @@ class TokenType(Enum):
     INSTRUCTION = "INSTRUCTION"
     CONSTANT_DEF = "CONSTANT_DEF"
     VARIABLE_DEF = "VARIABLE_DEF"
+    MACRO_DEF = "MACRO_DEF"
+    MACRO_END = "MACRO_END"
+    MACRO_CALL = "MACRO_CALL"
     IDENTIFIER = "IDENTIFIER"
     NUMBER = "NUMBER"
     HEX_NUMBER = "HEX_NUMBER"
@@ -49,6 +52,14 @@ class Symbol:
     line: int
 
 
+@dataclass
+class Macro:
+    name: str
+    parameters: List[str]
+    body: List[str]  # Lines of macro body
+    line: int
+
+
 class CompilerError(Exception):
     def __init__(self, message: str, line: int = 0, column: int = 0):
         self.message = message
@@ -58,7 +69,7 @@ class CompilerError(Exception):
 
 
 class Lexer:
-    """Tokenizes assembly source code"""
+    """Tokenizes assembly source code with macro support"""
     
     def __init__(self, source: str):
         self.source = source
@@ -187,7 +198,7 @@ class Lexer:
             elif char == ':':
                 self.advance()
                 if (self.current_char() and 
-                    (self.current_char().isalpha() or self.current_char() == '_')): # type: ignore
+                    (self.current_char().isalpha() or self.current_char() == '_')):  # type: ignore
                     label = self.read_identifier()
                     self.tokens.append(Token(TokenType.LABEL, label, line, column))
                 else:
@@ -213,11 +224,15 @@ class Lexer:
             elif char.isalpha() or char == '_': # type: ignore
                 identifier = self.read_identifier()
                 
-                # Check for constant/variable definitions
+                # Check for special keywords
                 if identifier.upper() in ['CONST', 'CONSTANT']:
                     self.tokens.append(Token(TokenType.CONSTANT_DEF, identifier, line, column))
                 elif identifier.upper() in ['VAR', 'VARIABLE']:
                     self.tokens.append(Token(TokenType.VARIABLE_DEF, identifier, line, column))
+                elif identifier.upper() == 'MACRO':
+                    self.tokens.append(Token(TokenType.MACRO_DEF, identifier, line, column))
+                elif identifier.upper() == 'ENDMACRO':
+                    self.tokens.append(Token(TokenType.MACRO_END, identifier, line, column))
                 elif identifier.upper() in NameToOpcode:
                     self.tokens.append(Token(TokenType.INSTRUCTION, identifier.upper(), line, column))
                 else:
@@ -231,12 +246,13 @@ class Lexer:
 
 
 class Parser:
-    """Parses tokens into an intermediate representation"""
+    """Parses tokens with macro support"""
     
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.pos = 0
         self.symbols: Dict[str, Symbol] = {}
+        self.macros: Dict[str, Macro] = {}
         self.instructions = []
         self.labels: Dict[str, int] = {}
     
@@ -284,7 +300,6 @@ class Parser:
         if value.lstrip('-').isdigit():
             return int(value)
         
-        # Simple arithmetic expression evaluation
         try:
             # Replace symbols in expression
             expr = value
@@ -292,9 +307,9 @@ class Parser:
                 if isinstance(symbol.value, int):
                     expr = expr.replace(symbol_name, str(symbol.value))
             
-            # Evaluate simple expressions (only +, -, *, /)
+            # Evaluate simple expressions
             if any(op in expr for op in ['+', '-', '*', '/']):
-                return eval(expr)  # Simple eval for basic arithmetic
+                return eval(expr)
             
             return int(expr)
         except:
@@ -306,18 +321,12 @@ class Parser:
             return ord(char_str)
         elif len(char_str) == 2 and char_str[0] == '\\':
             escape_chars = {
-                'n': 10,   # newline
-                't': 9,    # tab
-                'r': 13,   # carriage return
-                '\\': 92,  # backslash
-                "'": 39,   # single quote
-                '"': 34,   # double quote
-                '0': 0,    # null
+                'n': 10, 't': 9, 'r': 13, '\\': 92, "'": 39, '"': 34, '0': 0,
             }
             if char_str[1] in escape_chars:
                 return escape_chars[char_str[1]]
             else:
-                return ord(char_str[1])  # Treat as literal character
+                return ord(char_str[1])
         else:
             raise CompilerError(f"Invalid character literal: {char_str}")
     
@@ -328,15 +337,12 @@ class Parser:
         if token.type == TokenType.NUMBER:
             self.advance()
             return int(token.value)
-        
         elif token.type == TokenType.HEX_NUMBER:
             self.advance()
-            return int(token.value[1:], 16)  # Skip '$' prefix
-        
+            return int(token.value[1:], 16)
         elif token.type == TokenType.CHARACTER:
             self.advance()
             return self.char_to_ascii(token.value)
-        
         elif token.type == TokenType.IDENTIFIER:
             self.advance()
             if token.value in self.symbols:
@@ -346,21 +352,18 @@ class Parser:
                 else:
                     return self.evaluate_expression(str(symbol.value))
             else:
-                # Return as string for later resolution (could be a label)
                 return token.value
-        
         else:
             raise CompilerError(f"Expected value, got {token.type.value}", token.line, token.column)
     
     def parse_constant_definition(self):
         """Parse constant definition: CONST NAME value"""
         const_token = self.current_token()
-        self.advance()  # Skip CONST
+        self.advance()
         
         name_token = self.expect_token(TokenType.IDENTIFIER)
         value_str = ""
         
-        # Collect all tokens until newline to form the value expression
         while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
             value_str += self.current_token().value
             self.advance()
@@ -374,30 +377,135 @@ class Parser:
         except:
             raise CompilerError(f"Invalid constant value: {value_str}", const_token.line, const_token.column)
     
-    def parse_variable_definition(self):
-        """Parse variable definition: VAR NAME value"""
-        var_token = self.current_token()
-        self.advance()  # Skip VAR
+    def parse_macro_definition(self):
+        """Parse macro definition: MACRO name param1 param2 ... body ... ENDMACRO"""
+        macro_token = self.current_token()
+        self.advance()
         
+        # Get macro name
         name_token = self.expect_token(TokenType.IDENTIFIER)
-        value_str = ""
+        macro_name = name_token.value
         
-        # Collect all tokens until newline to form the value expression
-        while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
-            value_str += self.current_token().value
+        # Parse parameters
+        parameters = []
+        while (self.current_token().type == TokenType.IDENTIFIER):
+            param_token = self.current_token()
+            parameters.append(param_token.value)
             self.advance()
         
-        if not value_str.strip():
-            raise CompilerError("Variable definition missing value", var_token.line, var_token.column)
+        # Skip to newline after macro header
+        self.skip_newlines()
         
-        try:
-            value = self.evaluate_expression(value_str.strip())
-            self.symbols[name_token.value] = Symbol(name_token.value, value, 'variable', name_token.line)
-        except:
-            raise CompilerError(f"Invalid variable value: {value_str}", var_token.line, var_token.column)
+        # Collect macro body until ENDMACRO
+        body_lines = []
+        while (self.current_token().type != TokenType.MACRO_END and 
+               self.current_token().type != TokenType.EOF):
+            
+            if self.current_token().type == TokenType.NEWLINE:
+                self.advance()
+                continue
+            
+            # Collect tokens until newline to form a line
+            line_tokens = []
+            while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.MACRO_END]):
+                line_tokens.append(self.current_token().value)
+                self.advance()
+            
+            if line_tokens:
+                body_lines.append(' '.join(line_tokens))
+        
+        # Expect ENDMACRO
+        if self.current_token().type != TokenType.MACRO_END:
+            raise CompilerError("Expected ENDMACRO to close macro definition", 
+                              macro_token.line, macro_token.column)
+        self.advance()
+        
+        # Store macro
+        self.macros[macro_name] = Macro(macro_name, parameters, body_lines, macro_token.line)
+    
+    def expand_macro(self, macro_name: str, args: List[str]) -> List[str]:
+        """Expand a macro with given arguments"""
+        if macro_name not in self.macros:
+            raise CompilerError(f"Undefined macro: {macro_name}")
+        
+        macro = self.macros[macro_name]
+        
+        if len(args) != len(macro.parameters):
+            raise CompilerError(f"Macro {macro_name} expects {len(macro.parameters)} arguments, got {len(args)}")
+        
+        # Create parameter substitution map
+        param_map = dict(zip(macro.parameters, args))
+        
+        # Expand macro body
+        expanded_lines = []
+        for line in macro.body:
+            expanded_line = line
+            # Replace parameters with arguments
+            for param, arg in param_map.items():
+                expanded_line = expanded_line.replace(param, arg)
+            expanded_lines.append(expanded_line)
+        
+        return expanded_lines
+    
+    def parse_macro_call(self, macro_name: str):
+        """Parse and expand a macro call"""
+        # Collect arguments
+        args = []
+        while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
+            args.append(self.current_token().value)
+            self.advance()
+        
+        # Expand macro
+        expanded_lines = self.expand_macro(macro_name, args)
+        
+        # Parse expanded lines as if they were inline code
+        for line in expanded_lines:
+            if line.strip():
+                # Re-tokenize and parse the expanded line
+                sub_lexer = Lexer(line + '\n')
+                sub_tokens = sub_lexer.tokenize()
+                
+                # Remove EOF token
+                if sub_tokens and sub_tokens[-1].type == TokenType.EOF:
+                    sub_tokens.pop()
+                
+                # Parse the tokens
+                old_pos = self.pos
+                old_tokens = self.tokens
+                
+                self.tokens = sub_tokens
+                self.pos = 0
+                
+                # Parse this line
+                while self.pos < len(self.tokens):
+                    if self.current_token().type == TokenType.NEWLINE:
+                        self.advance()
+                        continue
+                    elif self.current_token().type == TokenType.COMMENT:
+                        self.advance()
+                        continue
+                    elif self.current_token().type == TokenType.LABEL:
+                        self.parse_label()
+                    elif self.current_token().type == TokenType.INSTRUCTION:
+                        self.parse_instruction()
+                    elif self.current_token().type == TokenType.IDENTIFIER:
+                        # Could be a macro call or unknown instruction
+                        identifier = self.current_token().value
+                        if identifier in self.macros:
+                            self.advance()
+                            self.parse_macro_call(identifier)
+                        else:
+                            raise CompilerError(f"Unknown identifier: {identifier}", 
+                                              self.current_token().line, self.current_token().column)
+                    else:
+                        self.advance()
+                
+                # Restore original token stream
+                self.tokens = old_tokens
+                self.pos = old_pos
     
     def validate_instruction_parameters(self, instruction_name: str, params: List[Union[int, str]], line: int):
-        """Validate instruction parameters against instruction requirements"""
+        """Validate instruction parameters"""
         if instruction_name not in NameToOpcode:
             raise CompilerError(f"Unknown instruction: {instruction_name}", line)
         
@@ -405,45 +513,23 @@ class Parser:
         instruction_class = InstructionSet[opcode]
         expected_length = instruction_class.length
         
-        # For instructions that take 2-byte addresses, expect 1 logical parameter
-        # For instructions that take individual bytes, expect exact byte count
         if expected_length == 2:
-            # 2-byte instructions expect exactly 1 address parameter
             if len(params) != 1:
-                raise CompilerError(
-                    f"Instruction {instruction_name} expects 1 address parameter, got {len(params)}", 
-                    line
-                )
-            # Validate the address parameter range
+                raise CompilerError(f"Instruction {instruction_name} expects 1 address parameter, got {len(params)}", line)
             param = params[0]
             if isinstance(param, int):
                 if not (0 <= param <= 65535):
-                    raise CompilerError(
-                        f"Address parameter for {instruction_name} must be 0-65535, got {param}", 
-                        line
-                    )
+                    raise CompilerError(f"Address parameter for {instruction_name} must be 0-65535, got {param}", line)
         elif expected_length == 1:
-            # 1-byte instructions expect exactly 1 byte parameter
             if len(params) != 1:
-                raise CompilerError(
-                    f"Instruction {instruction_name} expects 1 parameter, got {len(params)}", 
-                    line
-                )
-            # Validate the byte parameter range
+                raise CompilerError(f"Instruction {instruction_name} expects 1 parameter, got {len(params)}", line)
             param = params[0]
             if isinstance(param, int):
                 if not (0 <= param <= 255):
-                    raise CompilerError(
-                        f"Parameter for {instruction_name} must be 0-255, got {param}", 
-                        line
-                    )
+                    raise CompilerError(f"Parameter for {instruction_name} must be 0-255, got {param}", line)
         elif expected_length == 0:
-            # 0-byte instructions expect no parameters
             if len(params) != 0:
-                raise CompilerError(
-                    f"Instruction {instruction_name} expects no parameters, got {len(params)}", 
-                    line
-                )
+                raise CompilerError(f"Instruction {instruction_name} expects no parameters, got {len(params)}", line)
     
     def parse_instruction(self):
         """Parse an instruction with its parameters"""
@@ -453,12 +539,10 @@ class Parser:
         
         parameters = []
         
-        # Collect parameters until newline/comment/EOF
         while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
             param_value = self.parse_value()
             parameters.append(param_value)
         
-        # Validate instruction and parameters
         self.validate_instruction_parameters(instruction_name, parameters, instr_token.line)
         
         self.instructions.append({
@@ -474,12 +558,30 @@ class Parser:
         label_name = label_token.value
         self.advance()
         
-        # Labels point to the next instruction position
         self.labels[label_name] = len(self.instructions)
         self.symbols[label_name] = Symbol(label_name, len(self.instructions), 'label', label_token.line)
     
     def parse(self):
-        """Main parsing method"""
+        """Main parsing method with macro support"""
+        # First pass: collect macro definitions
+        while self.current_token().type != TokenType.EOF:
+            self.skip_newlines()
+            
+            if self.current_token().type == TokenType.EOF:
+                break
+            elif self.current_token().type == TokenType.COMMENT:
+                self.advance()
+            elif self.current_token().type == TokenType.MACRO_DEF:
+                self.parse_macro_definition()
+            elif self.current_token().type == TokenType.CONSTANT_DEF:
+                self.parse_constant_definition()
+            else:
+                # Skip non-macro definitions for now
+                self.advance()
+        
+        # Second pass: parse everything else including macro calls
+        self.pos = 0  # Reset to beginning
+        
         while self.current_token().type != TokenType.EOF:
             self.skip_newlines()
             
@@ -490,11 +592,31 @@ class Parser:
             elif self.current_token().type == TokenType.LABEL:
                 self.parse_label()
             elif self.current_token().type == TokenType.CONSTANT_DEF:
-                self.parse_constant_definition()
+                # Already parsed in first pass
+                while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF]):
+                    self.advance()
+            elif self.current_token().type == TokenType.MACRO_DEF:
+                # Skip macro definitions in second pass
+                while (self.current_token().type != TokenType.MACRO_END and 
+                       self.current_token().type != TokenType.EOF):
+                    self.advance()
+                if self.current_token().type == TokenType.MACRO_END:
+                    self.advance()
             elif self.current_token().type == TokenType.VARIABLE_DEF:
-                self.parse_variable_definition()
+                # Skip for now (not implemented)
+                while (self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF]):
+                    self.advance()
             elif self.current_token().type == TokenType.INSTRUCTION:
                 self.parse_instruction()
+            elif self.current_token().type == TokenType.IDENTIFIER:
+                # Could be a macro call
+                identifier = self.current_token().value
+                if identifier in self.macros:
+                    self.advance()
+                    self.parse_macro_call(identifier)
+                else:
+                    raise CompilerError(f"Unknown identifier: {identifier}", 
+                                      self.current_token().line, self.current_token().column)
             else:
                 token = self.current_token()
                 raise CompilerError(f"Unexpected token: {token.value}", token.line, token.column)
@@ -512,7 +634,6 @@ class CodeGenerator:
     
     def resolve_label_addresses(self):
         """Resolve label references to actual memory addresses"""
-        # Update all instructions with resolved label addresses
         for instruction in self.instructions:
             if instruction['type'] == 'instruction':
                 new_params = []
@@ -539,10 +660,8 @@ class CodeGenerator:
                 
                 self.machine_code.append(opcode)
                 
-                # Convert parameters to bytes
                 for param in instruction['parameters']:
                     if isinstance(param, int):
-                        # For 2-byte address instructions, split into high/low bytes
                         if instruction_class.length == 2 and len(instruction['parameters']) == 1:
                             # Single address parameter becomes two bytes
                             high_byte = (param >> 8) & 0xFF
@@ -552,14 +671,13 @@ class CodeGenerator:
                             # Single byte parameter
                             self.machine_code.append(param & 0xFF)
                     else:
-                        # This shouldn't happen after symbol resolution
                         raise CompilerError(f"Unresolved symbol: {param}")
         
         return self.machine_code
 
 
 class AdvancedCompiler:
-    """Main compiler class combining all phases"""
+    """Main compiler class with macro support"""
     
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
@@ -588,13 +706,14 @@ class AdvancedCompiler:
             if self.verbose:
                 print(f"Tokenized {len(tokens)} tokens")
             
-            # Parsing
+            # Parsing with macro expansion
             parser = Parser(tokens)
             parser.parse()
             
             if self.verbose:
                 print(f"Parsed {len(parser.instructions)} instructions")
                 print(f"Found {len(parser.symbols)} symbols")
+                print(f"Defined {len(parser.macros)} macros")
             
             # Code generation
             generator = CodeGenerator(parser.instructions, parser.symbols)
@@ -611,80 +730,17 @@ class AdvancedCompiler:
             raise CompilerError(f"Internal compiler error: {e}")
 
 
-# Legacy functions for backward compatibility
-def read_file(filename: str) -> str:
-    """Read file contents - legacy function"""
-    try:
-        with open(filename, "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {filename}")
-    except IOError as e:
-        raise IOError(f"Error reading file {filename}: {e}")
-    except UnicodeDecodeError:
-        raise ValueError(f"File {filename} is not a valid text file or contains invalid characters.")
-    except Exception as e:
-        raise Exception(f"An unexpected error occurred while reading {filename}: {e}")
-
-
-def strip_comments_and_whitespace(code: str) -> list[str]:
-    """Strip comments - legacy function"""
-    lines = code.splitlines()
-    stripped_lines = []
-    for line in lines:
-        line = line.split(";", 1)[0].strip()
-        if line:
-            stripped_lines.append(line)
-    return stripped_lines
-
-
-def addr_to_ints(addr: str) -> tuple[int, int]:
-    """Convert address to high/low bytes - legacy function"""
-    if not addr.startswith("$"):
-        raise ValueError(f"Invalid address format: {addr}")
-    try:
-        int_addr = int(addr[1:], 16)
-    except ValueError:
-        raise ValueError(f"Invalid address: {addr}")
-    if int_addr < 0 or int_addr > 0xFFFF:
-        raise ValueError(f"Address out of range: {addr}")
-    return (int_addr >> 8) & 0xFF, int_addr & 0X00FF
-
-
-def int_to_addr(value: int) -> tuple[int, int]:
-    """Convert integer to address bytes - legacy function"""
-    return (value >> 8) & 0xFF, value & 0x00FF
-
-
-def two_pass(code: str, verbose=False) -> Data:
-    """Legacy two-pass compiler function"""
-    compiler = AdvancedCompiler(verbose=verbose)
-    return compiler.compile_source(code)
-
-
+# Backward compatibility functions
 def compile(filename: str, verbose=False) -> Data:
     """Main compile function for backward compatibility"""
     compiler = AdvancedCompiler(verbose=verbose)
     return compiler.compile_file(filename)
 
 
-# Additional convenience functions
-def compile_file(filename: str, verbose: bool = False) -> Data:
-    """Compile assembly file to machine code"""
-    compiler = AdvancedCompiler(verbose=verbose)
-    return compiler.compile_file(filename)
-
-
-def compile_source(source: str, verbose: bool = False) -> Data:
-    """Compile assembly source to machine code"""
-    compiler = AdvancedCompiler(verbose=verbose)
-    return compiler.compile_source(source)
-
-
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="Advanced CPU Assembly Compiler")
+    parser = argparse.ArgumentParser(description="CPU Assembly Compiler with Macro Support")
     parser.add_argument("input_file", help="Assembly source file")
     parser.add_argument("-o", "--output", help="Output file for machine code")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
