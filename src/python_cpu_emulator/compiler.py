@@ -87,7 +87,7 @@ class Lexer:
         self.pos += 1
     
     def skip_whitespace(self):
-        while self.current_char() is not None and self.current_char() in ' \t':
+        while self.current_char() and self.current_char() in ' \t': # type: ignore
             self.advance()
     
     def read_number(self) -> str:
@@ -95,7 +95,7 @@ class Lexer:
         if self.current_char() == '-':
             self.advance()
         
-        while self.current_char() is not None and self.current_char().isdigit():
+        while self.current_char() and self.current_char().isdigit(): # type: ignore
             self.advance()
         
         return self.source[start_pos:self.pos]
@@ -104,8 +104,8 @@ class Lexer:
         start_pos = self.pos
         self.advance()  # Skip '$'
         
-        while (self.current_char() is not None and 
-               self.current_char() in '0123456789ABCDEFabcdef'):
+        while (self.current_char() and 
+               self.current_char() in '0123456789ABCDEFabcdef'): # type: ignore
             self.advance()
         
         return self.source[start_pos:self.pos]
@@ -113,8 +113,8 @@ class Lexer:
     def read_identifier(self) -> str:
         start_pos = self.pos
         
-        while (self.current_char() is not None and 
-               (self.current_char().isalnum() or self.current_char() in '_')):
+        while (self.current_char() and 
+               (self.current_char().isalnum() or self.current_char() in '_')): # type: ignore
             self.advance()
         
         return self.source[start_pos:self.pos]
@@ -186,8 +186,8 @@ class Lexer:
             
             elif char == ':':
                 self.advance()
-                if (self.current_char() is not None and 
-                    (self.current_char().isalpha() or self.current_char() == '_')):
+                if (self.current_char() and 
+                    (self.current_char().isalpha() or self.current_char() == '_')): # type: ignore
                     label = self.read_identifier()
                     self.tokens.append(Token(TokenType.LABEL, label, line, column))
                 else:
@@ -205,12 +205,12 @@ class Lexer:
                 string_literal = self.read_string()
                 self.tokens.append(Token(TokenType.STRING, string_literal, line, column))
             
-            elif (char.isdigit() or 
-                  (char == '-' and self.peek_char() is not None and self.peek_char().isdigit())):
+            elif (char.isdigit() or  # type: ignore
+                  (char == '-' and self.peek_char() is not None and self.peek_char().isdigit())): # type: ignore
                 number = self.read_number()
                 self.tokens.append(Token(TokenType.NUMBER, number, line, column))
             
-            elif char.isalpha() or char == '_':
+            elif char.isalpha() or char == '_': # type: ignore
                 identifier = self.read_identifier()
                 
                 # Check for constant/variable definitions
