@@ -217,7 +217,7 @@ class Lexer:
                 self.tokens.append(Token(TokenType.STRING, string_literal, line, column))
             
             elif (char.isdigit() or  # type: ignore
-                  (char == '-' and self.peek_char() is not None and self.peek_char().isdigit())): # type: ignore
+                (char == '-' and self.peek_char() is not None and self.peek_char().isdigit())): # type: ignore
                 number = self.read_number()
                 self.tokens.append(Token(TokenType.NUMBER, number, line, column))
             
@@ -237,6 +237,22 @@ class Lexer:
                     self.tokens.append(Token(TokenType.INSTRUCTION, identifier.upper(), line, column))
                 else:
                     self.tokens.append(Token(TokenType.IDENTIFIER, identifier, line, column))
+            
+            # Handle multi-character operators
+            elif char == '>' and self.peek_char() == '>':
+                self.advance()  # consume first >
+                self.advance()  # consume second >
+                self.tokens.append(Token(TokenType.IDENTIFIER, '>>', line, column))
+            
+            elif char == '<' and self.peek_char() == '<':
+                self.advance()  # consume first 
+                self.advance()  # consume second 
+                self.tokens.append(Token(TokenType.IDENTIFIER, '<<', line, column))
+            
+            # Handle single-character operators and symbols
+            elif char in '+-*/()&|^~%':  # type: ignore
+                self.tokens.append(Token(TokenType.IDENTIFIER, char, line, column))  # type: ignore
+                self.advance()
             
             else:
                 raise CompilerError(f"Unexpected character: {char}", line, column)
@@ -278,8 +294,8 @@ class Parser:
             self.advance()
     
     def evaluate_expression(self, value: str) -> int:
-        """Evaluate simple arithmetic expressions and resolve symbols"""
-        # Handle symbol substitution
+        """Evaluate arithmetic and bitwise expressions and resolve symbols"""
+        # Handle symbol substitution first
         if value in self.symbols:
             symbol = self.symbols[value]
             if isinstance(symbol.value, int):
@@ -296,25 +312,74 @@ class Parser:
         if value.startswith('$'):
             return int(value[1:], 16)
         
-        # Handle decimal numbers
+        # Handle simple decimal numbers (including negative)
         if value.lstrip('-').isdigit():
             return int(value)
         
         try:
-            # Replace symbols in expression
-            expr = value
-            for symbol_name, symbol in self.symbols.items():
-                if isinstance(symbol.value, int):
-                    expr = expr.replace(symbol_name, str(symbol.value))
+            # Create a working copy for symbol substitution
+            expr = value.strip()
             
-            # Evaluate simple expressions
-            if any(op in expr for op in ['+', '-', '*', '/']):
-                return eval(expr)
+            # Replace all known symbols with their numeric values
+            # Sort by length (descending) to handle longer symbol names first
+            sorted_symbols = sorted(self.symbols.items(), key=lambda x: len(x[0]), reverse=True)
+            for symbol_name, symbol in sorted_symbols:
+                if isinstance(symbol.value, int) and symbol_name in expr:
+                    # Use word boundaries to avoid partial replacements
+                    import re
+                    pattern = r'\b' + re.escape(symbol_name) + r'\b'
+                    expr = re.sub(pattern, str(symbol.value), expr)
             
-            return int(expr)
-        except:
-            raise CompilerError(f"Cannot evaluate expression: {value}")
-    
+            # Handle hex numbers in expressions
+            import re
+            hex_pattern = r'\$([0-9A-Fa-f]+)'
+            expr = re.sub(hex_pattern, lambda m: str(int(m.group(1), 16)), expr)
+            
+            # Handle character literals in expressions
+            char_pattern = r"'(.?)'"
+            def replace_char(match):
+                char_str = match.group(1)
+                return str(self.char_to_ascii(char_str))
+            expr = re.sub(char_pattern, replace_char, expr)
+            
+            # Clean up whitespace around operators
+            expr = re.sub(r'\s+', ' ', expr)
+            
+            # Now evaluate the expression safely
+            # Check if expression contains any operators we support
+            supported_ops = ['+', '-', '*', '//', '/', '%', '**', 
+                            '>>', '<<', '&', '|', '^']
+            
+            has_operators = any(op in expr for op in supported_ops)
+            
+            if has_operators:
+                # Create a restricted namespace for eval
+                allowed_names = {
+                    "__builtins__": {},
+                }
+                
+                # Validate that expression only contains safe characters and operators
+                import re
+                # Allow numbers, operators, parentheses, and whitespace
+                safe_pattern = r'^[0-9+\-*/()&|^<>\s%]+$'
+                if not re.match(safe_pattern, expr):
+                    raise ValueError(f"Expression contains unsafe characters: {expr}")
+                
+                # Evaluate the expression
+                result = eval(expr, allowed_names, {})
+                
+                # Ensure result is an integer
+                if isinstance(result, (int, float)):
+                    return int(result)
+                else:
+                    raise ValueError("Expression did not evaluate to a number")
+            else:
+                # No operators, should be a simple number
+                return int(expr)
+                
+        except Exception as e:
+            raise CompilerError(f"Cannot evaluate expression: {value} (Error: {str(e)})")
+        
     def char_to_ascii(self, char_str: str) -> int:
         """Convert character literal to ASCII value"""
         if len(char_str) == 1:
@@ -331,30 +396,53 @@ class Parser:
             raise CompilerError(f"Invalid character literal: {char_str}")
     
     def parse_value(self) -> Union[int, str]:
-        """Parse a value (number, hex, character, or symbol)"""
-        token = self.current_token()
+        """Parse a value or expression (number, hex, character, symbol, or complex expression)"""
+        # Collect tokens that form a complete expression
+        expression_parts = []
         
-        if token.type == TokenType.NUMBER:
+        while (self.current_token().type in [TokenType.NUMBER, TokenType.HEX_NUMBER, 
+                                            TokenType.CHARACTER, TokenType.IDENTIFIER] and
+            self.current_token().type not in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
+            
+            token = self.current_token()
+            expression_parts.append(token.value)
             self.advance()
-            return int(token.value)
-        elif token.type == TokenType.HEX_NUMBER:
-            self.advance()
-            return int(token.value[1:], 16)
-        elif token.type == TokenType.CHARACTER:
-            self.advance()
-            return self.char_to_ascii(token.value)
-        elif token.type == TokenType.IDENTIFIER:
-            self.advance()
-            if token.value in self.symbols:
-                symbol = self.symbols[token.value]
+            
+            # Stop if we hit a newline, comment, or EOF
+            if (self.current_token().type in [TokenType.NEWLINE, TokenType.EOF, TokenType.COMMENT]):
+                break
+        
+        if not expression_parts:
+            raise CompilerError("Expected value or expression", 
+                            self.current_token().line, self.current_token().column)
+        
+        # Join the parts and evaluate as expression
+        expression_str = ' '.join(expression_parts)
+        
+        # Handle simple single values
+        if len(expression_parts) == 1:
+            single_value = expression_parts[0]
+            
+            if single_value.lstrip('-').isdigit():
+                return int(single_value)
+            elif single_value.startswith('$'):
+                return int(single_value[1:], 16)
+            elif len(single_value) >= 2 and single_value.startswith("'") and single_value.endswith("'"):
+                return self.char_to_ascii(single_value[1:-1])
+            elif single_value in self.symbols:
+                symbol = self.symbols[single_value]
                 if isinstance(symbol.value, int):
                     return symbol.value
                 else:
                     return self.evaluate_expression(str(symbol.value))
             else:
-                return token.value
-        else:
-            raise CompilerError(f"Expected value, got {token.type.value}", token.line, token.column)
+                return single_value
+    
+        # Handle complex expressions
+        try:
+            return self.evaluate_expression(expression_str)
+        except:
+            raise CompilerError(f"Cannot evaluate expression: {expression_str}")
     
     def parse_constant_definition(self):
         """Parse constant definition: CONST NAME value"""
