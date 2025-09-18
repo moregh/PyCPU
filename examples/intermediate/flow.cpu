@@ -1,0 +1,140 @@
+; Convoluted Control Flow Test Program
+; This program demonstrates complex control flow patterns for testing
+; the flow diagram generator
+
+; Program calculates a simple value but uses unnecessarily complex jumps
+
+:ENTRY
+:START
+LDA 10              ; Start with value 10
+JMP VALIDATOR       ; Jump to validation
+
+:MAIN_LOOP
+:LOOP_START
+INA                 ; Increment A
+EAX                 ; Compare A with X (X should be 15)
+JMZ SUCCESS         ; If A equals X, we're done
+JMP COMPLEX_CHECK   ; Otherwise do complex checking
+
+:COMPLEX_CHECK
+; Convoluted way to check if A > 20
+LDX 20              ; Load 20 into X
+SAX                 ; A = A - X (A - 20)
+JMN CONTINUE_LOOP   ; If negative (A < 20), continue
+JMZ BOUNDARY_CASE   ; If zero (A == 20), special case
+JMP TOO_BIG         ; If positive (A > 20), handle overflow
+
+:CONTINUE_LOOP
+; Restore A value (it was modified by SAX)
+AAX                 ; A = A + X (restore original A)
+JMP DECISION_TREE   ; Go to decision tree
+
+:DECISION_TREE
+; Random decision based on A value
+CXA                 ; X = A
+BRA                 ; A = A >> 1 (divide by 2)
+NAX                 ; A = A & X (bitwise AND with original)
+EAX 3               ; Compare with 3
+JMZ PATH_A          ; If result is 3, take path A
+EAX 5               ; Compare with 5  
+JMZ PATH_B          ; If result is 5, take path B
+JMP PATH_C          ; Otherwise take path C
+
+:PATH_A
+LDA 42              ; Load magic number
+JMP MERGE_POINT     ; Rejoin main flow
+
+:PATH_B
+LDA 99              ; Load different magic number
+JMP WEIRD_DETOUR    ; Take a detour
+
+:PATH_C
+LDA 123             ; Load another magic number
+JMP MERGE_POINT     ; Rejoin main flow
+
+:WEIRD_DETOUR
+; Unnecessary complexity
+WMA $1000           ; Store A somewhere
+LDA 0               ; Clear A
+RMA $1000           ; Read it back
+CAX                 ; X = A
+JMP MERGE_POINT     ; Finally rejoin
+
+:MERGE_POINT
+; All paths converge here
+LDX 15              ; Reset X to target value
+JMP MAIN_LOOP       ; Back to main loop
+
+:BOUNDARY_CASE
+; Special handling for A == 20
+LDA 20              ; Ensure A is 20
+LDX 15              ; Set target
+JMP SUCCESS         ; Consider this success
+
+:TOO_BIG
+; Handle overflow case
+LDA 15              ; Reset to target value
+LDX 15              ; Set X to same
+JMP SUCCESS         ; Jump to success
+
+:VALIDATOR
+; Initial validation of input
+LDX 15              ; Set target value
+EAX 10              ; Check if A is 10
+JMZ MAIN_LOOP       ; If yes, start main loop
+JMP ERROR           ; Otherwise error
+
+:SUCCESS
+; Multiple labels at same address for testing
+:VICTORY
+:WIN
+WMA $2000           ; Store result
+JMP CLEANUP         ; Clean up and exit
+
+:CLEANUP
+LDA 0               ; Clear registers
+LDX 0
+LDY 0
+JMP EXIT            ; Jump to exit
+
+:ERROR
+; Error handling with its own mini-flow
+LDA 255             ; Error code
+WMA $FFFF           ; Store at end of memory
+JMP ERROR_RECOVERY  ; Try to recover
+
+:ERROR_RECOVERY
+; Attempt recovery
+LDA 1               ; Recovery attempt counter
+:RETRY_LOOP
+WMA $FFFE           ; Store retry count
+RMA $FFFE           ; Read it back
+INA                 ; Increment counter
+EAX 5               ; Compare with 5
+JMZ GIVE_UP         ; If 5 retries, give up
+LDX 10              ; Try to restart with 10
+JMP VALIDATOR       ; Go back to validator
+
+:GIVE_UP
+LDA 254             ; Fatal error code
+WMA $FFFF           ; Store error
+JMP EXIT            ; Exit with error
+
+:EXIT
+:PROGRAM_END
+JNZ UNREACHABLE
+:FINAL
+HLT                 ; Halt the program
+
+; Additional unreachable code to test dead code detection
+:DEAD_CODE
+LDA 666             ; This should never execute
+JMP DEAD_CODE       ; Infinite loop in dead code
+
+:ORPHANED_LABEL
+NOP                 ; Unreachable code
+JMP EXIT            ; Jump to exit
+
+:UNREACHABLE
+NOP
+JMP UNREACHABLE
